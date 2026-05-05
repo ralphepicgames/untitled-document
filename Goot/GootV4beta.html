@@ -4116,7 +4116,7 @@
 			transition: opacity 0.15s var(--motion-standard), transform 0.15s var(--motion-standard), box-shadow 0.2s ease, border-color 0.2s ease;
 			opacity: 0;
 			transform: translateY(12px);
-			border: 1px solid var(--md-sys-color-outline);
+			border: 1px solid color-mix(in srgb, var(--card-accent, var(--md-sys-color-outline)) 35%, var(--md-sys-color-outline));
 			z-index: 1;
 			display: flex;
 			flex-direction: column;
@@ -4246,6 +4246,8 @@
 			overflow: hidden;
 			background: var(--md-sys-color-surface);
 			flex-shrink: 0;
+			transform: translateZ(0);
+			-webkit-transform: translateZ(0);
 		}
 
 		/* Art image — zoom on hover like all-played */
@@ -4278,6 +4280,9 @@
 			inset: 0;
 			opacity: 0;
 			transition: opacity 0.3s ease, transform 0.3s ease;
+			will-change: transform;
+			backface-visibility: hidden;
+			-webkit-backface-visibility: hidden;
 		}
 
 		.folder-art img.loaded{ opacity: 1; }
@@ -4340,7 +4345,7 @@
 		.folder-style-v3 .folder-card {
 			aspect-ratio: 1/1;
 			background: color-mix(in srgb, var(--md-sys-color-primary) 3%, #000);
-			border-color: color-mix(in srgb, var(--md-sys-color-primary) 15%, var(--md-sys-color-outline));
+			border-color: color-mix(in srgb, var(--card-accent, var(--md-sys-color-primary)) 35%, var(--md-sys-color-outline));
 			border-radius: 16px;
 		}
 		.folder-style-v3 .folder-card:hover {
@@ -4357,6 +4362,16 @@
 			aspect-ratio: unset;
 			flex-shrink: unset;
 			border-radius: 0;
+			z-index: 1;
+		}
+		/* Gradient lives as pseudo on folder-card-art so it sits between art and buttons */
+		.folder-style-v3 .folder-card-art::after {
+			content: '';
+			position: absolute;
+			inset: 0;
+			background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.65) 20%, rgba(0,0,0,0.35) 45%, rgba(0,0,0,0.08) 70%, transparent 100%);
+			z-index: 1;
+			pointer-events: none;
 		}
 		/* Folder art background in v3 style */
 		.folder-style-v3 .folder-art {
@@ -4366,6 +4381,9 @@
 		.folder-style-v3 .folder-art img {
 			transform: scale(1.02);
 			transition: opacity 0.3s ease, transform 0.4s ease;
+			will-change: transform;
+			backface-visibility: hidden;
+			-webkit-backface-visibility: hidden;
 		}
 		.folder-style-v3 .folder-art img.loaded {
 			opacity: 1;
@@ -4385,11 +4403,15 @@
 			flex-direction: column;
 			justify-content: flex-end;
 			align-items: flex-start;
-			background: linear-gradient(to top, rgba(0,0,0,0.80) 0%, rgba(0,0,0,0.65) 20%, rgba(0,0,0,0.35) 45%, rgba(0,0,0,0.08) 70%, transparent 100%);
+			background: none;
 			transition: none;
+			pointer-events: none;
+		}
+		.folder-style-v3 .folder-info * {
+			pointer-events: auto;
 		}
 		.folder-style-v3 .folder-info.has-accent {
-			background: linear-gradient(to top, rgba(0,0,0,0.80) 0%, rgba(0,0,0,0.65) 20%, rgba(0,0,0,0.35) 45%, rgba(0,0,0,0.08) 70%, transparent 100%);
+			background: none;
 		}
 		.folder-style-v3 .folder-info span {
 			font-size: 14px;
@@ -4419,7 +4441,7 @@
 			background: color-mix(in srgb, var(--md-sys-color-primary) 5%, #111);
 		}
 		[data-theme="light"] .folder-style-v3 .folder-info {
-			background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.35) 50%, transparent 100%);
+			background: none;
 		}
 		[data-theme="light"] .folder-style-v3 .folder-info span { color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,0.7); }
 
@@ -4436,6 +4458,11 @@
 			pointer-events: none;
 			background: linear-gradient(to top, rgba(0, 0, 0, 0.6) 0%, transparent 60%);
 			z-index: 3;
+		}
+		/* v3 cards: gradient is on folder-card-art::after — overlay sits above it */
+		.folder-style-v3 .playlist-card .play-overlay {
+			background: none;
+			z-index: 2;
 		}
 
 		.playlist-card:hover .play-overlay{ opacity: 1; pointer-events: auto; }
@@ -21737,6 +21764,7 @@ async function loadFolders(id, refresh = false) {
             const singlesGrid = document.getElementById('singlesGrid');
             const _animOff2 = document.documentElement.classList.contains('animations-disabled') ||
                               document.documentElement.classList.contains('anim-speed-0');
+            const _singlesFragment = document.createDocumentFragment();
 
             tracks.forEach(t => {
                 const m = trackMetadata[t.id] || {};
@@ -21840,17 +21868,24 @@ async function loadFolders(id, refresh = false) {
                         if (meta?.artist && artistEl && !artistEl.textContent.trim()) artistEl.textContent = meta.artist;
                     }).catch(() => {});
                 }
-                singlesGrid.appendChild(card);
+                _singlesFragment.appendChild(card);
                 // Apply blocked state immediately
                 if (typeof isTrackBlocked === 'function' && isTrackBlocked(t.id)) {
                     card.classList.add('blocked-track');
                 }
-                if (_animOff2) {
-                    card.classList.add('loaded');
-                } else {
-                    requestAnimationFrame(() => card.classList.add('loaded'));
-                }
             });
+            // Single DOM insertion — zero intermediate reflows
+            singlesGrid.appendChild(_singlesFragment);
+            // Mirror folder cards: force browser to commit opacity:0/translateY starting state
+            // before the rAF fires, so the transition actually plays
+            if (_animOff2) {
+                singlesGrid.querySelectorAll('.folder-card:not(.loaded)').forEach(c => c.classList.add('loaded'));
+            } else {
+                void singlesGrid.offsetHeight;
+                requestAnimationFrame(() => {
+                    singlesGrid.querySelectorAll('.folder-card:not(.loaded)').forEach(c => c.classList.add('loaded'));
+                });
+            }
             // Sync grid size now that singlesGrid is in the DOM
             applyFolderGridSize();
         } else {
