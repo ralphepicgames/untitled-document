@@ -421,7 +421,7 @@ body.perf-mode .perf-badge{opacity:1}
 
 
 <!-- ============================================================
-     🔒 DEV STASH — secret screen, opened via Konami code
+     🔒 DEV STASH — secret screen, opened via password "douglasdev//"
      Add secret dev cards inside #dev-cards below.
      Nothing in here is visible to normal users.
      ============================================================ -->
@@ -525,24 +525,24 @@ function launchTelevisor(e){launch('https://televisor.untdocwebsites.workers.dev
 function launchChatterBoxDev(e){launch('https://chatterbox.untdocwebsites.workers.dev/dev?pw=mryeastmusic4eva','Loading ChatterBox Dev…',e)}
 // 🔒 END SECRET LINKS ─────────────────────────────────────────
 
-/* ── Konami Code ── */
+/* ── Password: douglasdev// ── */
 (function(){
-  const COMBO=['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a','Enter'];
-  let pos=0;
+  const PASSWORD='douglasdev//';
+  let typed='';
   let toastTimer=null;
 
   document.addEventListener('keydown',function(e){
-    const key=e.key;
-    if(key===COMBO[pos]){
-      pos++;
-      if(pos===COMBO.length){
-        pos=0;
+    if(e.key==='Escape'){closeDevStash();typed='';return;}
+    if(e.key.length===1){
+      typed+=e.key;
+      // only keep the last N chars needed
+      if(typed.length>PASSWORD.length) typed=typed.slice(-PASSWORD.length);
+      if(typed===PASSWORD){
+        typed='';
         openDevStash();
       }
     } else {
-      // restart, but check if this key starts the combo
-      pos=0;
-      if(key===COMBO[0]) pos=1;
+      typed='';
     }
   });
 
@@ -568,12 +568,7 @@ function launchChatterBoxDev(e){launch('https://chatterbox.untdocwebsites.worker
     document.getElementById('dev-stash').classList.remove('on');
   };
 
-  // Close on Escape
-  document.addEventListener('keydown',function(e){
-    if(e.key==='Escape'){
-      closeDevStash();
-    }
-  });
+
 })();
 </script>
 </body>
