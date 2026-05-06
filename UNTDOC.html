@@ -1656,31 +1656,93 @@ let cachedAccentColor = '#ff2b9e';
            try {
                const fullUrl = baseUrl + fileName;
                const response = await fetch(fullUrl);
+               if (!response.ok) throw new Error('HTTP ' + response.status);
                let html = await response.text();
 
                // Compute the base href: directory containing this file
                const baseHref = fullUrl.substring(0, fullUrl.lastIndexOf('/') + 1);
 
-               // Inject <base> tag if not already present — fixes all relative asset paths
-               if (!/<base[\s>]/i.test(html)) {
-                   if (/<head[\s>]/i.test(html)) {
-                       html = html.replace(/(<head[^>]*>)/i, `$1<base href="${baseHref}">`);
-                   } else {
-                       html = `<base href="${baseHref}">` + html;
-                   }
+               // Determine root for this game source (for root-relative path rewriting)
+               let rootHref;
+               if (baseUrl === seraphBaseUrl) {
+                   rootHref = SERAPH_ROOT;
+               } else {
+                   // For github raw URLs, root is origin + /
+                   try { rootHref = new URL('/', new URL(baseUrl).origin).href; } catch(e) { rootHref = baseHref; }
                }
 
-               // For seraph games, rewrite root-relative paths (/foo) to the seraph raw root
-               // <base> only fixes relative paths, not root-relative ones like src="/js/main.js"
-               if (baseUrl === seraphBaseUrl) {
-                   html = html.replace(/((?:src|href|action)=")\/(?!\/)/gi, `$1${SERAPH_ROOT}`);
+               // Rewrite root-relative paths (/foo) in static HTML attributes for ALL sources
+               html = html.replace(/((?:src|href|action|data-src)=")\/(?!\/)/gi, `$1${rootHref}`);
+               // Also rewrite url('/...') in inline styles
+               html = html.replace(/(url\(['"]?)\/(?!\/)/gi, `$1${rootHref}`);
+
+               // Inject <base> tag if not already present — fixes static relative asset paths
+               const baseTag = `<base href="${baseHref}">`;
+               // Inject a runtime patch script that fixes fetch() and XHR for relative/root URLs
+               // This is the key fix: <base> doesn't help JavaScript-driven asset loading
+               const patchScript = `<script>
+(function(){
+  var _base = ${JSON.stringify(baseHref)};
+  var _root = ${JSON.stringify(rootHref)};
+  function _resolve(url) {
+    if (typeof url !== 'string') return url;
+    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('//') || url.startsWith('data:') || url.startsWith('blob:')) return url;
+    if (url.startsWith('/')) return _root + url.slice(1);
+    try { return new URL(url, _base).href; } catch(e) { return url; }
+  }
+  var _fetch = window.fetch;
+  window.fetch = function(input, init) {
+    if (typeof input === 'string') input = _resolve(input);
+    else if (input instanceof Request) { var resolved = _resolve(input.url); if (resolved !== input.url) input = new Request(resolved, input); }
+    return _fetch.call(this, input, init);
+  };
+  var _open = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function(method, url, async, user, pass) {
+    return _open.call(this, method, _resolve(url), async !== undefined ? async : true, user, pass);
+  };
+  var _origImport = typeof __import !== 'undefined' ? __import : null;
+  var _createElement = document.createElement.bind(document);
+  document.createElement = function(tag) {
+    var el = _createElement(tag);
+    if (tag.toLowerCase() === 'script' || tag.toLowerCase() === 'img' || tag.toLowerCase() === 'link' || tag.toLowerCase() === 'audio' || tag.toLowerCase() === 'video' || tag.toLowerCase() === 'source') {
+      var srcDesc = Object.getOwnPropertyDescriptor(el.__proto__, 'src') || Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'src');
+      var hrefDesc = Object.getOwnPropertyDescriptor(el.__proto__, 'href') || Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'href');
+      ['src','href','data'].forEach(function(attr) {
+        var orig = Object.getOwnPropertyDescriptor(el.__proto__, attr);
+        if (!orig || !orig.set) return;
+        Object.defineProperty(el, attr, {
+          get: function() { return orig.get ? orig.get.call(this) : this.getAttribute(attr); },
+          set: function(v) { if (orig.set) orig.set.call(this, _resolve(v)); else this.setAttribute(attr, _resolve(v)); },
+          configurable: true
+        });
+      });
+    }
+    return el;
+  };
+})();
+<\/script>`;
+
+               if (!/<base[\s>]/i.test(html)) {
+                   if (/<head[\s>]/i.test(html)) {
+                       html = html.replace(/(<head[^>]*>)/i, `$1${baseTag}${patchScript}`);
+                   } else {
+                       html = baseTag + patchScript + html;
+                   }
+               } else {
+                   // base tag already exists, still inject the patch script
+                   if (/<head[\s>]/i.test(html)) {
+                       html = html.replace(/(<head[^>]*>)/i, `$1${patchScript}`);
+                   } else {
+                       html = patchScript + html;
+                   }
                }
 
                win.document.open();
                win.document.write(html);
                win.document.close();
-           } catch (e) { 
-               win.location.href = baseUrl + fileName; 
+           } catch (e) {
+               // Fallback: navigate directly (works if no CORS issue at target)
+               try { win.location.href = baseUrl + fileName; } catch(e2) {}
            }
            finally { 
                document.getElementById('loader').classList.remove('active');
