@@ -1641,13 +1641,17 @@ let cachedAccentColor = '#ff2b9e';
 
    const SERAPH_ROOT = 'https://cdn.jsdelivr.net/gh/a456pur/seraph@ae2fcc6d6a9cd051654fcc0519080db1f79cf2a7/';
 
-   async function launchGame(fileName, baseUrl, isPNG = false) {
+   
+const CORS_PROXY = 'https://untdocunblock.untdocapis.workers.dev/?url=';
+function proxiedFetch(url) { return fetch(CORS_PROXY + encodeURIComponent(url)); }
+async function launchGame(fileName, baseUrl, isPNG = false) {
        document.getElementById('loader').classList.add('active');
        const win = window.open('about:blank', '_blank');
        
        if (isPNG) {
            const fullUrl = baseUrl + fileName;
-           const imageHTML = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${fileName}</title><style>body{margin:0;padding:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#000}img{max-width:100%;max-height:100vh;object-fit:contain}</style></head><body><img src="${fullUrl}" alt="${fileName}"></body></html>`;
+           const proxiedUrl = CORS_PROXY + encodeURIComponent(fullUrl);
+           const imageHTML = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${fileName}</title><style>body{margin:0;padding:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#000}img{max-width:100%;max-height:100vh;object-fit:contain}</style></head><body><img src="${proxiedUrl}" alt="${fileName}"></body></html>`;
            win.document.open();
            win.document.write(imageHTML);
            win.document.close();
@@ -1655,7 +1659,7 @@ let cachedAccentColor = '#ff2b9e';
        } else {
            try {
                const fullUrl = baseUrl + fileName;
-               const response = await fetch(fullUrl);
+               const response = await proxiedFetch(fullUrl);
                if (!response.ok) throw new Error('HTTP ' + response.status);
                let html = await response.text();
 
@@ -1765,36 +1769,40 @@ let cachedAccentColor = '#ff2b9e';
 
    function launchRandomGame() {
        const btn = document.getElementById('randomGameBtn');
-       const ralphOn = filterRalph.checked;
-       const onefileOn = filterOnefile.checked;
-       const seraphOn = filterSeraph ? filterSeraph.checked : true;
-
-       const pool = [];
-       for (let i = 0; i < allGames.length; i++) {
-           const g = allGames[i];
-           let show;
-           if (g.baseUrl === BASE_URL) show = ralphOn;
-           else if (g.baseUrl === onefileBaseUrl) show = onefileOn;
-           else if (g.baseUrl === seraphBaseUrl) show = seraphOn;
-           else show = true;
-           if (show) pool.push(g);
+       const pools = [];
+       if (filterRalph.checked) {
+           const ralphPool = allGames.filter(g => g.baseUrl === BASE_URL);
+           if (ralphPool.length) pools.push(ralphPool);
        }
+       if (filterOnefile.checked) {
+           const onefilePool = allGames.filter(g => g.baseUrl === onefileBaseUrl);
+           if (onefilePool.length) pools.push(onefilePool);
+       }
+       if (filterSeraph && filterSeraph.checked) {
+           const seraphPool = allGames.filter(g => g.baseUrl === seraphBaseUrl);
+           if (seraphPool.length) pools.push(seraphPool);
+       }
+       const otherPool = allGames.filter(g => g.baseUrl !== BASE_URL && g.baseUrl !== onefileBaseUrl && g.baseUrl !== seraphBaseUrl);
+       if (otherPool.length) pools.push(otherPool);
 
-       if (pool.length === 0) return;
+       if (pools.length === 0) return;
 
        if (btn) {
            btn.classList.add('spinning');
            setTimeout(() => btn.classList.remove('spinning'), 560);
        }
 
-       const chosen = pool[cryptoRandInt(pool.length)];
+       const poolIdx = cryptoRandInt(pools.length);
+       const chosenPool = pools[poolIdx];
+       const chosen = chosenPool[cryptoRandInt(chosenPool.length)];
+       console.log('[RANDOM] picked', chosen.name, chosen.baseUrl, 'pool', poolIdx, 'size', chosenPool.length);
        launchGame(chosen.file, chosen.baseUrl, chosen.isPNG);
    }
 
    const title = document.getElementById('zaddyTitle');
 
    function goToMonoLauncher() {
-       fetch('https://raw.githubusercontent.com/ralphepicgames/FUCKANTHONYLIOTINE/refs/heads/main/MonoLaunch.html?t=' + Date.now())
+       proxiedFetch('https://raw.githubusercontent.com/ralphepicgames/FUCKANTHONYLIOTINE/refs/heads/main/MonoLaunch.html?t=' + Date.now())
            .then(r => r.text())
            .then(html => {
                document.open();
