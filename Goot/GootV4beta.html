@@ -4916,15 +4916,15 @@
 			inset: 0;
 			background-size: cover;
 			background-position: center;
-			filter: blur(60px) saturate(1.8) brightness(0.5);
+			filter: blur(120px) saturate(1.8) brightness(0.15);
 			opacity: 0;
 			transition: opacity 0.5s var(--motion-standard);
 			z-index: 0;
 			pointer-events: none;
-			transform: scale(1.08);
+			transform: scale(1.15);
 		}
-		#albumViewBg.visible { opacity: 0.6; }
-		[data-theme="light"] #albumViewBg { filter: blur(60px) saturate(1.9) brightness(1.05); }
+		#albumViewBg.visible { opacity: 1; }
+		[data-theme="light"] #albumViewBg { filter: blur(120px) saturate(1.9) brightness(1.05); }
 		[data-theme="light"] #albumViewBg.visible { opacity: 0.45; }
 
 		/* ══════════════════════════════════════════════════════════════════════
@@ -4954,7 +4954,7 @@
 			background: var(--split-banner-bg, transparent);
 			background-size: cover;
 			background-position: center;
-			filter: blur(40px) saturate(1.2) brightness(0.35);
+			filter: blur(40px) saturate(1.4) brightness(0.50);
 			z-index: 0;
 		}
 		/* Art container — fixed square, solid right edge (no fade) */
@@ -5098,6 +5098,53 @@
 			#aotySection .aoty-card-title { font-size: 15px !important; }
 		}
 	
+		/* ── Split layout — light mode overrides ────────────────────────── */
+		/* In dark mode the ::before blur is darkened (brightness 0.35) so white text
+		   reads clearly. In light mode we instead keep it bright and slightly washed,
+		   then use dark text so it matches the overall light theme. */
+		[data-theme="light"] body.album-layout-split #library-screen.album-view #folderCoverBanner::before {
+			filter: blur(40px) saturate(1.4) brightness(1.15) !important;
+			opacity: 0.55;
+		}
+		/* Overlay a soft white scrim so the blurred art doesn't fight dark text */
+		[data-theme="light"] body.album-layout-split #library-screen.album-view #folderCoverBanner {
+			background: rgba(255,255,255,0.18) !important;
+		}
+		/* Text inside the info column should be dark on light, not white */
+		[data-theme="light"] body.album-layout-split #folderCoverTitle,
+		[data-theme="light"] body.album-layout-split #folderCoverLabel,
+		[data-theme="light"] body.album-layout-split #folderCoverMeta {
+			color: rgba(15,15,20,0.92) !important;
+			text-shadow: 0 1px 6px rgba(255,255,255,0.6) !important;
+		}
+		/* Action buttons in light split view */
+		[data-theme="light"] body.album-layout-split #folderCoverActions .m3-btn {
+			background: rgba(255,255,255,0.65) !important;
+			color: var(--md-sys-color-on-surface) !important;
+			backdrop-filter: blur(4px) !important;
+			-webkit-backdrop-filter: blur(4px) !important;
+			border: 1px solid rgba(0,0,0,0.1) !important;
+		}
+		/* AOTY section is transparent in split — give it a frosted glass look in light */
+		[data-theme="light"] body.album-layout-split #aotySection {
+			background: rgba(255,255,255,0.35) !important;
+			backdrop-filter: blur(8px) !important;
+			-webkit-backdrop-filter: blur(8px) !important;
+			border-left: 1px solid rgba(255,255,255,0.5) !important;
+			box-shadow: none !important;
+		}
+		[data-theme="light"] body.album-layout-split #aotySection .aoty-card-title,
+		[data-theme="light"] body.album-layout-split #aotySection .aoty-score-num,
+		[data-theme="light"] body.album-layout-split #aotySection .aoty-score-label,
+		[data-theme="light"] body.album-layout-split #aotySection .aoty-score-count,
+		[data-theme="light"] body.album-layout-split #aotySection .aoty-link-pill {
+			color: rgba(15,15,20,0.9) !important;
+		}
+		[data-theme="light"] body.album-layout-split #aotySection .aoty-card-icon {
+			background: rgba(0,0,0,0.1) !important;
+			color: rgba(15,15,20,0.8) !important;
+		}
+
 		/* ── Album layout button picker ─────────────────────────────────── */
 		/* Hide album layout setting on mobile - split is always default */
 		@media (max-width: 768px) {
