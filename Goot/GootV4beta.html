@@ -16377,12 +16377,17 @@ class LastFMIntegration {
             if (duration) params['duration[0]'] = Math.floor(duration);
             const data = await this.signAndPost(params);
             if (data.scrobbles && data.scrobbles['@attr'].accepted > 0) {
+                // Last.fm batch endpoint always returns scrobble as an array even for
+                // single entries — guard against both array and plain-object shapes.
+                const scrobbleEntry = Array.isArray(data.scrobbles.scrobble)
+                    ? data.scrobbles.scrobble[0]
+                    : data.scrobbles.scrobble;
                 this.scrobbleHistory.unshift({
                     title,
                     artist,
                     album,
                     timestamp: Date.now(),
-                    scrobbleId: data.scrobbles.scrobble.timestamp
+                    scrobbleId: scrobbleEntry?.timestamp
                 });
                 this.saveSettings();
                 this.renderScrobbleHistory();
@@ -16436,11 +16441,13 @@ class LastFMIntegration {
         return Math.floor(seconds / 86400) + ' days ago';
     }
     async signAndPost(params) {
-        const body = new URLSearchParams({ ...params, format: 'json' });
+        // Send as JSON so bracket keys like track[0]/artist[0] aren't percent-encoded
+        // by URLSearchParams — encoding them breaks the Last.fm signature since the
+        // worker signs the raw key names and Last.fm receives encoded ones.
         const response = await fetch(PLAYER_WORKER_URL + '/lastfm-sign', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: body.toString()
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...params, format: 'json' })
         });
         const text = await response.text();
         if (!response.ok) {
@@ -38272,14 +38279,17 @@ player.onplay = () => {
         const shouldUpdate = !lastfm.nowPlayingTrack ||
                             lastfm.nowPlayingTrack.title !== title ||
                             lastfm.nowPlayingTrack.artist !== artist ||
-                            currentPlayer.currentTime < 5;
+                            player.currentTime < 5;
         if (shouldUpdate && title && title !== 'Unknown Track' && artist && artist !== 'Unknown Artist') {
-            lastfm.updateNowPlaying(
-                title,
-                artist,
-                album,
-                currentPlayer.duration
-            );
+            // duration is often NaN/0 at onplay time — wait for it before calling
+            const _doNP = (dur) => lastfm.updateNowPlaying(title, artist, album, dur);
+            if (player.duration && isFinite(player.duration)) {
+                _doNP(player.duration);
+            } else {
+                const _onDur = () => { player.removeEventListener('durationchange', _onDur); _doNP(player.duration); };
+                player.addEventListener('durationchange', _onDur);
+                setTimeout(() => { player.removeEventListener('durationchange', _onDur); if (!lastfm.nowPlayingTrack || lastfm.nowPlayingTrack.title !== title) _doNP(player.duration); }, 3000);
+            }
         }
     }
 };
@@ -38339,14 +38349,17 @@ player2.onplay = () => {
         const shouldUpdate = !lastfm.nowPlayingTrack ||
                             lastfm.nowPlayingTrack.title !== title ||
                             lastfm.nowPlayingTrack.artist !== artist ||
-                            currentPlayer.currentTime < 5;
+                            player2.currentTime < 5;
         if (shouldUpdate && title && title !== 'Unknown Track' && artist && artist !== 'Unknown Artist') {
-            lastfm.updateNowPlaying(
-                title,
-                artist,
-                album,
-                currentPlayer.duration
-            );
+            // duration is often NaN/0 at onplay time — wait for it before calling
+            const _doNP2 = (dur) => lastfm.updateNowPlaying(title, artist, album, dur);
+            if (player2.duration && isFinite(player2.duration)) {
+                _doNP2(player2.duration);
+            } else {
+                const _onDur2 = () => { player2.removeEventListener('durationchange', _onDur2); _doNP2(player2.duration); };
+                player2.addEventListener('durationchange', _onDur2);
+                setTimeout(() => { player2.removeEventListener('durationchange', _onDur2); if (!lastfm.nowPlayingTrack || lastfm.nowPlayingTrack.title !== title) _doNP2(player2.duration); }, 3000);
+            }
         }
     }
 };
