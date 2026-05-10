@@ -13577,7 +13577,15 @@
 								</div>
 								<i class="fa-solid fa-chevron-right settings-nav-arrow"></i>
 							</button>
-							<button class="settings-nav-row" id="settings-nav-chart-rename" onclick="openSettingsSection('chart-rename')" style="display:none;">
+							<button class="settings-nav-row" id="settings-nav-folder-map" onclick="openSettingsSection('folder-map')" style="display:none;">
+									<div class="settings-nav-icon"><i class="fa-solid fa-folder-tree"></i></div>
+									<div class="settings-nav-text">
+										<div class="settings-nav-title">Folder Maps</div>
+										<div class="settings-nav-sub">Pin artists, albums, or songs to a specific folder</div>
+									</div>
+									<i class="fa-solid fa-chevron-right settings-nav-arrow"></i>
+								</button>
+								<button class="settings-nav-row" id="settings-nav-chart-rename" onclick="openSettingsSection('chart-rename')" style="display:none;">
 								<div class="settings-nav-icon"><i class="fa-solid fa-chart-simple"></i></div>
 								<div class="settings-nav-text">
 									<div class="settings-nav-title">Chart Album Rename</div>
@@ -13993,25 +14001,90 @@
 							</div>
 							<div id="art-redirect-status" style="display:none;font-size:13px;padding:8px 12px;border-radius:8px;"></div>
 						</div>
-						<div class="m3-card" style="padding:20px 16px;margin-top:16px;">
-							<div style="margin-bottom:16px;">
-								<div style="font-weight:600;font-size:15px;margin-bottom:4px;">Album Art Versions</div>
-								<div style="font-size:13px;opacity:0.6;margin-bottom:12px;">Append <code style="font-family:monospace;font-size:12px;">?v=N</code> to bypass edge cache after uploading higher quality art.</div>
-								<input id="artver-album-input" type="text" placeholder="Album name (e.g. VULTURES 1)" autocomplete="off" style="width:100%;box-sizing:border-box;padding:10px 14px;border-radius:10px;border:1px solid color-mix(in srgb,var(--md-sys-color-primary) 30%,transparent);background:color-mix(in srgb,var(--md-sys-color-surface-variant) 60%,transparent);color:inherit;font-size:14px;outline:none;margin-bottom:8px;">
-								<input id="artver-artist-input" type="text" placeholder="Artist (e.g. ¥$, Kanye West, Ty Dolla $ign)" autocomplete="off" style="width:100%;box-sizing:border-box;padding:10px 14px;border-radius:10px;border:1px solid color-mix(in srgb,var(--md-sys-color-primary) 30%,transparent);background:color-mix(in srgb,var(--md-sys-color-surface-variant) 60%,transparent);color:inherit;font-size:14px;outline:none;margin-bottom:8px;">
-								<input id="artver-version-input" type="number" min="1" placeholder="Version number (e.g. 2)" autocomplete="off" style="width:100%;box-sizing:border-box;padding:10px 14px;border-radius:10px;border:1px solid color-mix(in srgb,var(--md-sys-color-primary) 30%,transparent);background:color-mix(in srgb,var(--md-sys-color-surface-variant) 60%,transparent);color:inherit;font-size:14px;outline:none;margin-bottom:12px;">
-							</div>
-							<div style="display:flex;gap:8px;margin-bottom:12px;">
-								<button class="m3-btn m3-btn-filled" style="flex:1;justify-content:center;" onclick="previewArtVersion()"><i class="fa-solid fa-eye"></i> Preview</button>
-								<button class="m3-btn m3-btn-tonal" style="flex:1;justify-content:center;" onclick="purgeArtCache()"><i class="fa-solid fa-trash-can"></i> Purge Cache</button>
-							</div>
-							<div id="artver-preview" style="display:none;margin-bottom:12px;text-align:center;">
-								<img id="artver-preview-img" style="max-width:100%;max-height:200px;border-radius:10px;object-fit:cover;" src="" alt="Album art preview">
-								<div id="artver-preview-url" style="font-size:11px;opacity:0.4;margin-top:6px;font-family:monospace;word-break:break-all;"></div>
-							</div>
-							<div id="artver-status" style="display:none;font-size:13px;padding:8px 12px;border-radius:8px;"></div>
+				<div class="m3-card" id="settings-panel-folder-map" style="display:none;padding:20px 16px;margin-bottom:16px;">
+					<div style="font-size:13px;opacity:0.6;margin-bottom:14px;">Map an artist, album, or song name to a specific Google Drive folder. Clicking that item in the now-playing bar or search will jump straight to that folder.</div>
+					<div style="display:flex;gap:8px;margin-bottom:12px;">
+						<button id="fmap-type-artist" class="m3-btn m3-btn-filled"  style="flex:1;font-size:13px;" onclick="fmapSetType('artist')">Artist</button>
+						<button id="fmap-type-album"  class="m3-btn m3-btn-tonal"   style="flex:1;font-size:13px;" onclick="fmapSetType('album')">Album</button>
+						<button id="fmap-type-song"   class="m3-btn m3-btn-tonal"   style="flex:1;font-size:13px;" onclick="fmapSetType('song')">Song</button>
+					</div>
+					<!-- Name input -->
+					<input id="fmap-name-input" type="text" placeholder="Name (e.g. Kanye West)" autocomplete="off"
+						style="width:100%;box-sizing:border-box;padding:10px 14px;border-radius:10px;border:1px solid color-mix(in srgb,var(--md-sys-color-primary) 30%,transparent);background:color-mix(in srgb,var(--md-sys-color-surface-variant) 60%,transparent);color:inherit;font-size:14px;outline:none;margin-bottom:8px;">
+					<!-- Album search (album mode only) -->
+					<div id="fmap-album-search-wrap" style="display:none;position:relative;margin-bottom:8px;">
+						<div style="position:relative;">
+							<i class="fa-solid fa-magnifying-glass" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:13px;opacity:0.4;pointer-events:none;"></i>
+							<input id="fmap-album-search-input" type="text" placeholder="Search albums…" autocomplete="off"
+								oninput="fmapAlbumSearch(this.value)"
+								style="width:100%;box-sizing:border-box;padding:10px 14px 10px 34px;border-radius:10px;border:1px solid color-mix(in srgb,var(--md-sys-color-primary) 30%,transparent);background:color-mix(in srgb,var(--md-sys-color-surface-variant) 60%,transparent);color:inherit;font-size:14px;outline:none;">
 						</div>
-				<div class="m3-card" id="settings-panel-chart-rename" style="display:none;padding:20px 16px;margin-bottom:16px;">
+						<!-- Selected album pill -->
+						<div id="fmap-album-selected" style="display:none;margin-top:6px;padding:8px 12px;border-radius:8px;background:color-mix(in srgb,var(--md-sys-color-primary) 14%,transparent);border:1px solid color-mix(in srgb,var(--md-sys-color-primary) 30%,transparent);align-items:center;gap:8px;">
+							<i class="fa-solid fa-compact-disc" style="color:var(--md-sys-color-primary);font-size:13px;flex-shrink:0;"></i>
+							<div style="flex:1;min-width:0;">
+								<div id="fmap-album-selected-title"  style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--md-sys-color-primary);"></div>
+								<div id="fmap-album-selected-artist" style="font-size:11px;opacity:0.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+							</div>
+							<button onclick="fmapClearAlbumSelection()" style="background:none;border:none;color:var(--md-sys-color-primary);cursor:pointer;padding:2px 6px;border-radius:6px;font-size:13px;opacity:0.7;" title="Clear">✕</button>
+						</div>
+						<!-- Dropdown results -->
+						<div id="fmap-album-dropdown" style="display:none;position:absolute;left:0;right:0;z-index:200;margin-top:4px;border-radius:10px;border:1px solid color-mix(in srgb,var(--md-sys-color-outline) 30%,transparent);background:var(--md-sys-color-surface);box-shadow:0 4px 20px rgba(0,0,0,0.3);overflow:hidden;max-height:220px;overflow-y:auto;"></div>
+					</div>
+					<!-- Folder search (artist / album modes) -->
+					<div id="fmap-folder-search-wrap" style="position:relative;margin-bottom:8px;">
+						<div style="position:relative;">
+							<i class="fa-solid fa-magnifying-glass" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:13px;opacity:0.4;pointer-events:none;"></i>
+							<input id="fmap-folder-search-input" type="text" placeholder="Search folders…" autocomplete="off"
+								oninput="fmapFolderSearch(this.value)"
+								style="width:100%;box-sizing:border-box;padding:10px 14px 10px 34px;border-radius:10px;border:1px solid color-mix(in srgb,var(--md-sys-color-primary) 30%,transparent);background:color-mix(in srgb,var(--md-sys-color-surface-variant) 60%,transparent);color:inherit;font-size:14px;outline:none;">
+						</div>
+						<!-- Selected folder pill -->
+						<div id="fmap-folder-selected" style="display:none;margin-top:6px;padding:8px 12px;border-radius:8px;background:color-mix(in srgb,var(--md-sys-color-primary) 14%,transparent);border:1px solid color-mix(in srgb,var(--md-sys-color-primary) 30%,transparent);display:none;align-items:center;gap:8px;">
+							<i class="fa-solid fa-folder-open" style="color:var(--md-sys-color-primary);font-size:13px;flex-shrink:0;"></i>
+							<div style="flex:1;min-width:0;">
+								<div id="fmap-folder-selected-name" style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--md-sys-color-primary);"></div>
+								<div id="fmap-folder-selected-id"   style="font-size:10px;opacity:0.5;font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+							</div>
+							<button onclick="fmapClearFolderSelection()" style="background:none;border:none;color:var(--md-sys-color-primary);cursor:pointer;padding:2px 6px;border-radius:6px;font-size:13px;opacity:0.7;" title="Clear">✕</button>
+						</div>
+						<!-- Dropdown results -->
+						<div id="fmap-folder-dropdown" style="display:none;position:absolute;left:0;right:0;z-index:200;margin-top:4px;border-radius:10px;border:1px solid color-mix(in srgb,var(--md-sys-color-outline) 30%,transparent);background:var(--md-sys-color-surface);box-shadow:0 4px 20px rgba(0,0,0,0.3);overflow:hidden;max-height:220px;overflow-y:auto;"></div>
+					</div>
+					<!-- Song search (song mode only) -->
+					<div id="fmap-song-search-wrap" style="display:none;position:relative;margin-bottom:8px;">
+						<div style="position:relative;">
+							<i class="fa-solid fa-magnifying-glass" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:13px;opacity:0.4;pointer-events:none;"></i>
+							<input id="fmap-song-search-input" type="text" placeholder="Search songs…" autocomplete="off"
+								oninput="fmapSongSearch(this.value)"
+								style="width:100%;box-sizing:border-box;padding:10px 14px 10px 34px;border-radius:10px;border:1px solid color-mix(in srgb,var(--md-sys-color-primary) 30%,transparent);background:color-mix(in srgb,var(--md-sys-color-surface-variant) 60%,transparent);color:inherit;font-size:14px;outline:none;">
+						</div>
+						<!-- Selected song pill -->
+						<div id="fmap-song-selected" style="display:none;margin-top:6px;padding:8px 12px;border-radius:8px;background:color-mix(in srgb,var(--md-sys-color-primary) 14%,transparent);border:1px solid color-mix(in srgb,var(--md-sys-color-primary) 30%,transparent);align-items:center;gap:8px;">
+							<i class="fa-solid fa-music" style="color:var(--md-sys-color-primary);font-size:13px;flex-shrink:0;"></i>
+							<div style="flex:1;min-width:0;">
+								<div id="fmap-song-selected-title"  style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--md-sys-color-primary);"></div>
+								<div id="fmap-song-selected-artist" style="font-size:11px;opacity:0.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+								<div id="fmap-song-selected-id"     style="font-size:10px;opacity:0.4;font-family:monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+							</div>
+							<button onclick="fmapClearSongSelection()" style="background:none;border:none;color:var(--md-sys-color-primary);cursor:pointer;padding:2px 6px;border-radius:6px;font-size:13px;opacity:0.7;" title="Clear">✕</button>
+						</div>
+						<!-- Dropdown results -->
+						<div id="fmap-song-dropdown" style="display:none;position:absolute;left:0;right:0;z-index:200;margin-top:4px;border-radius:10px;border:1px solid color-mix(in srgb,var(--md-sys-color-outline) 30%,transparent);background:var(--md-sys-color-surface);box-shadow:0 4px 20px rgba(0,0,0,0.3);overflow:hidden;max-height:220px;overflow-y:auto;"></div>
+					</div>
+					<!-- Hidden inputs still used by fmapSave() -->
+					<input id="fmap-folderid-input"   type="hidden">
+					<input id="fmap-foldername-input" type="hidden">
+					<input id="fmap-trackid-input"    type="hidden">
+					<input id="fmap-artist-input"     type="hidden">
+					<button class="m3-btn m3-btn-filled" style="width:100%;margin-bottom:8px;" onclick="fmapSave()"><i class="fa-solid fa-plus"></i> Add / Update Map</button>
+					<div id="fmap-status" style="display:none;font-size:13px;padding:8px 12px;border-radius:8px;margin-bottom:12px;"></div>
+					<div style="font-size:12px;font-weight:600;opacity:0.5;letter-spacing:0.5px;text-transform:uppercase;margin-bottom:8px;">Current Maps</div>
+					<div id="fmap-list" style="display:flex;flex-direction:column;gap:6px;">
+						<div style="font-size:13px;opacity:0.4;padding:8px 4px;">Loading…</div>
+					</div>
+				</div>
+			<div class="m3-card" id="settings-panel-chart-rename" style="display:none;padding:20px 16px;margin-bottom:16px;">
 					<div style="margin-bottom:16px;">
 						<div style="font-size:13px;opacity:0.6;margin-bottom:12px;">Rename an album in the Goot Charts Durable Object. All play counts (day / week / month / alltime) are preserved — only the name changes.</div>
 						<input id="chart-rename-artist-input" type="text" placeholder="Artist (e.g. Mr. Yeast Music)" autocomplete="off" style="width:100%;box-sizing:border-box;padding:10px 14px;border-radius:10px;border:1px solid color-mix(in srgb,var(--md-sys-color-primary) 30%,transparent);background:color-mix(in srgb,var(--md-sys-color-surface-variant) 60%,transparent);color:inherit;font-size:14px;outline:none;margin-bottom:8px;">
@@ -14495,7 +14568,7 @@
 												<div id="npTitle" class="np-marquee" style="font-weight:600;font-size:16px;line-height:1.3;letter-spacing:-0.01em;">No Track</div>
 											</div>
 											<div class="np-marquee-wrap" style="margin-bottom:1px;">
-												<div id="npArtist" class="np-marquee np-clickable" onclick="event.stopPropagation(); npNavigateToArtistFolder()" title="Go to artist folder" style="font-size:14px;opacity:0.75;font-weight:500;">Select music</div>
+												<div id="npArtist" class="np-marquee" title="Go to artist folder" style="font-size:14px;opacity:0.75;font-weight:500;">Select music</div>
 											</div>
 											<div class="np-marquee-wrap">
 												<div id="npAlbum" class="np-marquee np-clickable" onclick="event.stopPropagation(); npNavigateToAlbumFolder()" title="Go to album folder" style="font-size:13px;opacity:0.5;">—</div>
@@ -23915,6 +23988,7 @@ function setNpArtist(artistTag, skipClickable) {
     if (!npArtist) return;
     const displayArtist = skipClickable ? artistTag : (formatArtist(artistTag) || artistTag);
     npArtist.textContent = displayArtist;
+    npArtist.dataset.artistTag = displayArtist; // stamp for stale-check in _updateNpArtistClickable
     npArtist.onclick = null;
     npArtist.classList.remove('np-clickable');
     npArtist.style.cursor = '';
@@ -23927,12 +24001,31 @@ async function _updateNpArtistClickable(artistTag) {
     if (!npArtist) return;
     const artists = _splitArtists(artistTag);
     if (artists.length === 0) return;
+
+    // Fire all folder checks in parallel
     const checks = await Promise.all(artists.map(a => _checkArtistHasFolder(a).then(r => ({ name: a, folder: r }))));
+
+    // Abort if the track changed while we were waiting
+    if (npArtist.dataset.artistTag !== artistTag) return;
+
     const sep = artistTag.includes(';') ? '; ' : artistTag.includes('/') ? '/' : ', ';
     npArtist.innerHTML = '';
     npArtist.onclick = null;
     npArtist.classList.remove('np-clickable');
     npArtist.style.cursor = '';
+
+    if (artists.length === 1) {
+        // Single artist — make the whole div clickable if folder found
+        npArtist.textContent = artists[0];
+        if (checks[0].folder) {
+            npArtist.classList.add('np-clickable');
+            npArtist.style.cursor = 'pointer';
+            npArtist.onclick = (e) => { e.stopPropagation(); _navigateToArtistFolderDirect(checks[0].folder); };
+        }
+        return;
+    }
+
+    // Multiple artists — render individual spans, only clickable ones get np-clickable
     checks.forEach((c, i) => {
         const span = document.createElement('span');
         span.textContent = c.name;
@@ -23940,6 +24033,7 @@ async function _updateNpArtistClickable(artistTag) {
         if (c.folder) {
             span.className = 'np-clickable';
         }
+        // No artist-pending here — folder check already resolved above
         npArtist.appendChild(span);
         if (i < checks.length - 1) {
             const sepSpan = document.createElement('span');
@@ -27642,6 +27736,8 @@ function _redirectTapUnlock() {
             if (artBtn) artBtn.style.display = '';
             const chartRenameBtn = document.getElementById('settings-nav-chart-rename');
             if (chartRenameBtn) chartRenameBtn.style.display = '';
+            const folderMapBtn = document.getElementById('settings-nav-folder-map');
+            if (folderMapBtn) folderMapBtn.style.display = '';
             showNotification('🔓 Admin tools unlocked');
         }
     } else {
@@ -42861,6 +42957,13 @@ const SETTINGS_SECTIONS = {
     panel: 'settings-panel-art-redirect',
     secret: true
   },
+  'folder-map': {
+    title: 'Folder Maps',
+    sub: 'Pin artists, albums, or songs to a folder',
+    icon: '<i class="fa-solid fa-folder-tree"></i>',
+    panel: 'settings-panel-folder-map',
+    secret: true
+  },
   'chart-rename': {
     title: 'Chart Album Rename',
     sub: 'Rename an album in the charts without losing plays',
@@ -43891,6 +43994,545 @@ async function toggle8D() {
     }, 100);
     console.log('[GootBGPlay v3] Background audio keep-alive active.');
 })();
+</script>
+<script>
+// ── Folder Map admin panel ────────────────────────────────────────────────────
+let _fmapType = 'artist';
+const _FMAP_ADMIN_KEY = 'penis';
+
+// ── Folder search state ───────────────────────────────────────────────────────
+let _fmapFolderSearchTimer = null;
+let _fmapSongSearchTimer   = null;
+
+// ── Folder list cache for client-side search ──────────────────────────────────
+// Walks the already-warmed folderContentsCache (full tree, depth 4) to build a
+// flat list of every folder with its path for display. Falls back to a single
+// ?list=ROOT_ID fetch if the prewarm hasn't populated the cache yet.
+let _fmapAllFolders = null; // null = not built yet; array once ready
+
+function _fmapBuildFromCache() {
+    // folderContentsCache: Map<folderId, { data: [{id, name, mimeType, ...}] }>
+    if (typeof folderContentsCache === 'undefined' || folderContentsCache.size === 0) return null;
+
+    // Build a parent→children map and id→name map from the cache
+    const nameOf = { [ROOT_ID]: 'Home' };
+    const childrenOf = {}; // parentId → [{ id, name }]
+
+    for (const [parentId, entry] of folderContentsCache) {
+        for (const f of (entry.data || [])) {
+            if (f.mimeType !== 'application/vnd.google-apps.folder') continue;
+            nameOf[f.id] = f.name;
+            if (!childrenOf[parentId]) childrenOf[parentId] = [];
+            childrenOf[parentId].push({ id: f.id, name: f.name });
+        }
+    }
+
+    // BFS from ROOT_ID to build flat list with path strings
+    const result = [];
+    const queue = [{ id: ROOT_ID, pathParts: [] }];
+    const seen = new Set();
+    while (queue.length) {
+        const { id, pathParts } = queue.shift();
+        if (seen.has(id)) continue;
+        seen.add(id);
+        for (const child of (childrenOf[id] || [])) {
+            if (seen.has(child.id)) continue;
+            const parts = [...pathParts, child.name];
+            result.push({
+                id: child.id,
+                name: child.name,
+                path: parts.join(' / '), // e.g. "Kanye West / VULTURES 1"
+            });
+            queue.push({ id: child.id, pathParts: parts });
+        }
+    }
+    return result.length ? result : null;
+}
+
+async function _fmapEnsureRootFolders() {
+    if (_fmapAllFolders !== null) return _fmapAllFolders;
+
+    // Try the prewarm cache first (instant, no network)
+    const fromCache = _fmapBuildFromCache();
+    if (fromCache) { _fmapAllFolders = fromCache; return _fmapAllFolders; }
+
+    // Prewarm not ready yet — fetch root level and return that for now,
+    // but don't permanently cache so we'll retry from the full cache next time.
+    try {
+        const res = await fetch(`${STREAMING_URL}?list=${ROOT_ID}`);
+        if (!res.ok) throw new Error(res.status);
+        const data = await res.json();
+        const items = Array.isArray(data) ? data : (data.files || data.items || []);
+        const folders = items
+            .filter(f => f.mimeType === 'application/vnd.google-apps.folder')
+            .map(f => ({ id: f.id, name: f.name, path: f.name }));
+        // Only cache permanently if we got a real result
+        if (folders.length) _fmapAllFolders = folders;
+        return folders;
+    } catch(_) {
+        return [];
+    }
+}
+
+function fmapSetType(type) {
+    _fmapType = type;
+    ['artist','album','song'].forEach(t => {
+        const btn = document.getElementById('fmap-type-' + t);
+        if (!btn) return;
+        btn.className = (t === type ? 'm3-btn m3-btn-filled' : 'm3-btn m3-btn-tonal');
+        btn.style.flex = '1';
+        btn.style.fontSize = '13px';
+    });
+    const placeholders = { artist: 'Name (e.g. Kanye West)', album: 'Name (e.g. VULTURES 1)', song: 'Name (e.g. Gorgeous)' };
+    const nameInput = document.getElementById('fmap-name-input');
+    if (nameInput) {
+        nameInput.placeholder = placeholders[type] || 'Name';
+        // Only show the manual name input for artist mode — album/song get their name from search
+        nameInput.style.display = type === 'artist' ? '' : 'none';
+        if (type !== 'artist') nameInput.value = '';
+    }
+
+    // Toggle search UIs
+    const folderWrap = document.getElementById('fmap-folder-search-wrap');
+    const albumWrap  = document.getElementById('fmap-album-search-wrap');
+    const songWrap   = document.getElementById('fmap-song-search-wrap');
+    if (folderWrap) folderWrap.style.display = type === 'song' ? 'none' : '';
+    if (albumWrap)  albumWrap.style.display  = type === 'album' ? '' : 'none';
+    if (songWrap)   songWrap.style.display   = type === 'song' ? '' : 'none';
+
+    // Clear selections when switching type
+    fmapClearFolderSelection();
+    fmapClearAlbumSelection();
+    fmapClearSongSelection();
+}
+
+// ── Folder search (artist / album) ────────────────────────────────────────────
+// Uses ?list=ROOT_ID (the same endpoint the app already uses) fetched once and
+// cached, then filtered client-side on every keystroke. No new worker endpoint needed.
+function fmapFolderSearch(query) {
+    clearTimeout(_fmapFolderSearchTimer);
+    const dropdown = document.getElementById('fmap-folder-dropdown');
+    if (!dropdown) return;
+    if (!query.trim()) { dropdown.style.display = 'none'; return; }
+    dropdown.style.display = '';
+    dropdown.innerHTML = '<div style="font-size:13px;opacity:0.4;padding:10px 14px;">Searching…</div>';
+    _fmapFolderSearchTimer = setTimeout(async () => {
+        try {
+            const folders = await _fmapEnsureRootFolders();
+            const q = query.trim().toLowerCase();
+            const results = folders.filter(f => f.name && f.name.toLowerCase().includes(q));
+            if (!results.length) {
+                dropdown.innerHTML = '<div style="font-size:13px;opacity:0.4;padding:10px 14px;">No folders found.</div>';
+                return;
+            }
+            const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            dropdown.innerHTML = results.slice(0, 40).map(r => {
+                const safeId   = esc(r.id);
+                const safeName = esc(r.name).replace(/'/g, "\\'");
+                const pathDisplay = r.path !== r.name ? esc(r.path) : '';
+                return `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;transition:background 0.12s;border-bottom:1px solid color-mix(in srgb,var(--md-sys-color-outline) 15%,transparent);"
+                    onmouseenter="this.style.background='color-mix(in srgb,var(--md-sys-color-primary) 10%,transparent)'"
+                    onmouseleave="this.style.background=''"
+                    onclick="fmapSelectFolder('${safeId}','${safeName}','${safeName}')">
+                    <i class="fa-solid fa-folder" style="opacity:0.45;flex-shrink:0;font-size:13px;width:14px;text-align:center;"></i>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(r.name)}</div>
+                        <div style="font-size:11px;opacity:0.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+                            ${pathDisplay ? `<span style="opacity:0.8;">${pathDisplay}</span> · ` : ''}<span style="font-family:monospace;font-size:10px;">${esc(r.id)}</span>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        } catch(e) {
+            dropdown.innerHTML = '<div style="font-size:13px;opacity:0.4;padding:10px 14px;">Search failed.</div>';
+        }
+    }, 200);
+}
+
+function fmapSelectFolder(id, name, label) {
+    document.getElementById('fmap-folderid-input').value   = id;
+    document.getElementById('fmap-foldername-input').value = name;
+    const sel = document.getElementById('fmap-folder-selected');
+    document.getElementById('fmap-folder-selected-name').textContent = label || name;
+    document.getElementById('fmap-folder-selected-id').textContent   = id;
+    if (sel) { sel.style.display = 'flex'; }
+    const dropdown = document.getElementById('fmap-folder-dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+    const input = document.getElementById('fmap-folder-search-input');
+    if (input) input.value = '';
+    // Auto-fill name input with the album/artist label if empty
+    const nameInput = document.getElementById('fmap-name-input');
+    if (nameInput && !nameInput.value.trim()) nameInput.value = label || name;
+}
+
+function fmapClearFolderSelection() {
+    document.getElementById('fmap-folderid-input').value   = '';
+    document.getElementById('fmap-foldername-input').value = '';
+    const sel = document.getElementById('fmap-folder-selected');
+    if (sel) sel.style.display = 'none';
+    const input = document.getElementById('fmap-folder-search-input');
+    if (input) input.value = '';
+    const dropdown = document.getElementById('fmap-folder-dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+}
+
+// ── Album search (album mode) ─────────────────────────────────────────────────
+let _fmapAlbumSearchTimer = null;
+
+function fmapAlbumSearch(query) {
+    clearTimeout(_fmapAlbumSearchTimer);
+    const dropdown = document.getElementById('fmap-album-dropdown');
+    if (!dropdown) return;
+    if (!query.trim()) { dropdown.style.display = 'none'; return; }
+    dropdown.style.display = '';
+    dropdown.innerHTML = '<div style="font-size:13px;opacity:0.4;padding:10px 14px;">Searching…</div>';
+    _fmapAlbumSearchTimer = setTimeout(async () => {
+        try {
+            const res = await fetch(`${SEARCH_API_URL}/metadata/search/ai`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: query.trim() })
+            });
+            if (!res.ok) throw new Error(res.status);
+            const data = await res.json();
+            const albums = (data.albums || []).slice(0, 20);
+            if (!albums.length) {
+                dropdown.innerHTML = '<div style="font-size:13px;opacity:0.4;padding:10px 14px;">No albums found.</div>';
+                return;
+            }
+            const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            dropdown.innerHTML = albums.map(a => {
+                const albumName  = a.album  || a.name || '';
+                const artistName = a.artist || '';
+                return `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;transition:background 0.12s;border-bottom:1px solid color-mix(in srgb,var(--md-sys-color-outline) 15%,transparent);"
+                    onmouseenter="this.style.background='color-mix(in srgb,var(--md-sys-color-primary) 10%,transparent)'"
+                    onmouseleave="this.style.background=''"
+                    onclick="fmapSelectAlbum('${esc(albumName).replace(/'/g,"\\'")}','${esc(artistName).replace(/'/g,"\\'")}')">
+                    <i class="fa-solid fa-compact-disc" style="opacity:0.45;flex-shrink:0;font-size:13px;"></i>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(albumName)}</div>
+                        <div style="font-size:11px;opacity:0.55;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(artistName)}</div>
+                    </div>
+                </div>`;
+            }).join('');
+        } catch(e) {
+            dropdown.innerHTML = '<div style="font-size:13px;opacity:0.4;padding:10px 14px;">Search failed.</div>';
+        }
+    }, 350);
+}
+
+function fmapSelectAlbum(albumName, artistName) {
+    const sel = document.getElementById('fmap-album-selected');
+    document.getElementById('fmap-album-selected-title').textContent  = albumName;
+    document.getElementById('fmap-album-selected-artist').textContent = artistName;
+    if (sel) sel.style.display = 'flex';
+    const dropdown = document.getElementById('fmap-album-dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+    const input = document.getElementById('fmap-album-search-input');
+    if (input) input.value = '';
+    // Store artist for disambiguation
+    const artistInput = document.getElementById('fmap-artist-input');
+    if (artistInput) artistInput.value = artistName;
+    // Auto-fill name input with album name if empty
+    const nameInput = document.getElementById('fmap-name-input');
+    if (nameInput && !nameInput.value.trim()) nameInput.value = albumName;
+}
+
+function fmapClearAlbumSelection() {
+    const sel = document.getElementById('fmap-album-selected');
+    if (sel) sel.style.display = 'none';
+    const input = document.getElementById('fmap-album-search-input');
+    if (input) input.value = '';
+    const dropdown = document.getElementById('fmap-album-dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+}
+
+// ── Song search (song mode) ───────────────────────────────────────────────────
+function fmapSongSearch(query) {
+    clearTimeout(_fmapSongSearchTimer);
+    const dropdown = document.getElementById('fmap-song-dropdown');
+    if (!dropdown) return;
+    if (!query.trim()) { dropdown.style.display = 'none'; return; }
+    dropdown.style.display = '';
+    dropdown.innerHTML = '<div style="font-size:13px;opacity:0.4;padding:10px 14px;">Searching…</div>';
+    _fmapSongSearchTimer = setTimeout(async () => {
+        try {
+            const res = await fetch(`${SEARCH_API_URL}/metadata/search/ai`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query: query.trim() })
+            });
+            if (!res.ok) throw new Error(res.status);
+            const data = await res.json();
+            const tracks = (data.tracks || []).slice(0, 20);
+            if (tracks.length === 0) {
+                dropdown.innerHTML = '<div style="font-size:13px;opacity:0.4;padding:10px 14px;">No songs found.</div>';
+                return;
+            }
+            const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            dropdown.innerHTML = tracks.map(t => {
+                const title  = cleanDisplayName ? cleanDisplayName(t.title || '') : (t.title || '');
+                const artist = t.artist || '';
+                const tid    = t.id || '';
+                return `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;transition:background 0.12s;border-bottom:1px solid color-mix(in srgb,var(--md-sys-color-outline) 15%,transparent);"
+                    onmouseenter="this.style.background='color-mix(in srgb,var(--md-sys-color-primary) 10%,transparent)'"
+                    onmouseleave="this.style.background=''"
+                    onclick="fmapSelectSong('${esc(tid)}','${esc(title).replace(/'/g,"\\'")}','${esc(artist).replace(/'/g,"\\'")}')">
+                    <i class="fa-solid fa-music" style="opacity:0.45;flex-shrink:0;font-size:13px;"></i>
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(title)}</div>
+                        <div style="font-size:11px;opacity:0.55;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(artist)}</div>
+                    </div>
+                    <div style="font-size:10px;opacity:0.3;font-family:monospace;flex-shrink:0;">${esc(tid.slice(0,8))}…</div>
+                </div>`;
+            }).join('');
+        } catch(e) {
+            dropdown.innerHTML = '<div style="font-size:13px;opacity:0.4;padding:10px 14px;">Search failed.</div>';
+        }
+    }, 350);
+}
+
+function fmapSelectSong(id, title, artist) {
+    document.getElementById('fmap-trackid-input').value = id;
+    const sel = document.getElementById('fmap-song-selected');
+    document.getElementById('fmap-song-selected-title').textContent  = title;
+    document.getElementById('fmap-song-selected-artist').textContent = artist;
+    document.getElementById('fmap-song-selected-id').textContent     = id;
+    if (sel) sel.style.display = 'flex';
+    const dropdown = document.getElementById('fmap-song-dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+    const input = document.getElementById('fmap-song-search-input');
+    if (input) input.value = '';
+    // Store artist for disambiguation
+    const artistInput = document.getElementById('fmap-artist-input');
+    if (artistInput) artistInput.value = artist;
+    // Auto-fill name input if empty
+    const nameInput = document.getElementById('fmap-name-input');
+    if (nameInput && !nameInput.value.trim()) nameInput.value = title;
+}
+
+function fmapClearSongSelection() {
+    document.getElementById('fmap-trackid-input').value = '';
+    const sel = document.getElementById('fmap-song-selected');
+    if (sel) sel.style.display = 'none';
+    const input = document.getElementById('fmap-song-search-input');
+    if (input) input.value = '';
+    const dropdown = document.getElementById('fmap-song-dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+}
+
+// Close dropdowns when clicking outside
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('#fmap-folder-search-wrap')) {
+        const d = document.getElementById('fmap-folder-dropdown');
+        if (d) d.style.display = 'none';
+    }
+    if (!e.target.closest('#fmap-album-search-wrap')) {
+        const d = document.getElementById('fmap-album-dropdown');
+        if (d) d.style.display = 'none';
+    }
+    if (!e.target.closest('#fmap-song-search-wrap')) {
+        const d = document.getElementById('fmap-song-dropdown');
+        if (d) d.style.display = 'none';
+    }
+}, true);
+
+function _fmapShowStatus(msg, ok) {
+    const el = document.getElementById('fmap-status');
+    if (!el) return;
+    el.textContent = msg;
+    el.style.display = '';
+    el.style.background = ok ? 'color-mix(in srgb,var(--md-sys-color-primary) 12%,transparent)' : 'color-mix(in srgb,#f44336 12%,transparent)';
+    el.style.color = ok ? 'var(--md-sys-color-primary)' : '#f44336';
+    clearTimeout(el._hideTimer);
+    el._hideTimer = setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+async function fmapSave() {
+    // For album/song modes, name comes from the selected search result, not the manual input
+    let name = document.getElementById('fmap-name-input')?.value.trim();
+    if (_fmapType === 'album') {
+        name = document.getElementById('fmap-album-selected-title')?.textContent.trim() || name;
+    } else if (_fmapType === 'song') {
+        name = document.getElementById('fmap-song-selected-title')?.textContent.trim() || name;
+    }
+    const folderId   = document.getElementById('fmap-folderid-input')?.value.trim();
+    const folderName = document.getElementById('fmap-foldername-input')?.value.trim();
+    const trackId    = _fmapType === 'song' ? (document.getElementById('fmap-trackid-input')?.value.trim() || '') : '';
+    const artist     = document.getElementById('fmap-artist-input')?.value.trim() || '';
+    if (!name) {
+        if (_fmapType === 'artist') { _fmapShowStatus('Enter a name.', false); }
+        else if (_fmapType === 'album') { _fmapShowStatus('Search and select an album first.', false); }
+        else { _fmapShowStatus('Search and select a song first.', false); }
+        return;
+    }
+    if (!folderId)   { _fmapShowStatus('Search and select a folder first.', false); return; }
+    if (!folderName) { _fmapShowStatus('Search and select a folder first.', false); return; }
+    if (_fmapType === 'song' && !trackId) { _fmapShowStatus('Search and select a song first.', false); return; }
+    try {
+        const res = await fetch(PLAYER_WORKER_URL + '/folder-map', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'X-Admin-Key': _FMAP_ADMIN_KEY },
+            body: JSON.stringify({ type: _fmapType, name, folderId, folderName, trackId, artist })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || res.status);
+        _fmapShowStatus('✓ Saved: "' + name + '"' + (artist ? ' (' + artist + ')' : '') + ' → ' + folderName, true);
+        // update local cache immediately — store under both artist-qualified and name-only keys
+        const entry = { type: _fmapType, name, folderId, folderName, trackId, artist };
+        _folderMapCache.set(_fmapMakeKey(_fmapType, name, artist), entry);
+        _folderMapCache.set(_fmapMakeKey(_fmapType, name, ''), entry); // fallback key
+        // Clear all inputs and search selections
+        const nameEl = document.getElementById('fmap-name-input'); if (nameEl) nameEl.value = '';
+        const artistEl = document.getElementById('fmap-artist-input'); if (artistEl) artistEl.value = '';
+        fmapClearFolderSelection();
+        fmapClearAlbumSelection();
+        fmapClearSongSelection();
+        if (typeof _artistFolderCache !== 'undefined') _artistFolderCache.clear();
+        await fmapLoadList();
+    } catch (e) {
+        _fmapShowStatus('Error: ' + e.message, false);
+    }
+}
+
+async function fmapDelete(type, name, artist) {
+    const label = name + (artist ? ' (' + artist + ')' : '');
+    if (!confirm('Remove folder map for "' + label + '"?')) return;
+    try {
+        const params = new URLSearchParams({ type, name });
+        if (artist) params.set('artist', artist);
+        const res = await fetch(PLAYER_WORKER_URL + '/folder-map?' + params, {
+            method: 'DELETE',
+            headers: { 'X-Admin-Key': _FMAP_ADMIN_KEY }
+        });
+        if (!res.ok) throw new Error((await res.json()).error || res.status);
+        // remove from local cache immediately
+        _folderMapCache.delete(_fmapMakeKey(type, name, artist));
+        _folderMapCache.delete(_fmapMakeKey(type, name, ''));
+        if (typeof _artistFolderCache !== 'undefined') _artistFolderCache.clear();
+        if (typeof _folderMapCache !== 'undefined') _folderMapCache.clear();
+        await fmapLoadList();
+    } catch (e) {
+        _fmapShowStatus('Delete failed: ' + e.message, false);
+    }
+}
+
+async function fmapLoadList() {
+    const listEl = document.getElementById('fmap-list');
+    if (!listEl) return;
+    listEl.innerHTML = '<div style="font-size:13px;opacity:0.4;padding:8px 4px;">Loading…</div>';
+    try {
+        const res = await fetch(PLAYER_WORKER_URL + '/folder-map/list');
+        const maps = await res.json();
+        if (!maps.length) {
+            listEl.innerHTML = '<div style="font-size:13px;opacity:0.4;padding:8px 4px;">No maps yet.</div>';
+            return;
+        }
+        const typeIcon = { artist: 'fa-user', album: 'fa-compact-disc', song: 'fa-music' };
+        listEl.innerHTML = maps.map(m => {
+            const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+            const nameEsc   = esc(m.name).replace(/'/g, '\\\'');
+            const artistEsc = esc(m.artist || '').replace(/'/g, '\\\'');
+            return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--md-sys-color-surface-variant) 50%,transparent);">
+                <i class="fa-solid ${typeIcon[m.type]||'fa-folder'}" style="opacity:0.5;width:16px;text-align:center;flex-shrink:0;"></i>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(m.name)}${m.artist ? ' <span style="opacity:0.5;font-weight:400;">(' + esc(m.artist) + ')</span>' : ''}</div>
+                    <div style="font-size:11px;opacity:0.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(m.type)} → ${esc(m.folderName)} <span style="opacity:0.5;">(${esc(m.folderId)})</span></div>
+                </div>
+                <button class="m3-btn m3-btn-tonal" style="font-size:11px;padding:4px 10px;flex-shrink:0;" onclick="fmapDelete('${esc(m.type)}','${nameEsc}','${artistEsc}')">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            </div>`;
+        }).join('');
+    } catch (e) {
+        listEl.innerHTML = '<div style="font-size:13px;opacity:0.4;padding:8px 4px;">Failed to load.</div>';
+    }
+}
+
+// Hook openSettingsSection to load list and pre-warm folder cache when panel opens
+(function() {
+    const _orig = openSettingsSection;
+    openSettingsSection = function(key) {
+        _orig(key);
+        if (key === 'folder-map') {
+            fmapLoadList();
+            // Invalidate so we re-check folderContentsCache (may have finished prewarm since last open)
+            _fmapAllFolders = null;
+            _fmapEnsureRootFolders(); // pre-warm so first search is instant
+        }
+    };
+})();
+
+// ── Folder Map navigation hooks ───────────────────────────────────────────────
+// Loaded once at startup from /folder-map/list — no per-artist fetches ever.
+const _folderMapCache = new Map(); // key → entry  (see _fmapMakeKey)
+let _folderMapReady = false;
+
+// Key format: "type:normalizedname" (no artist) or "type:normalizedartist|normalizedname" (with artist)
+function _fmapMakeKey(type, name, artist) {
+    const n = (name   || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const a = (artist || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    return a ? (type + ':' + a + '|' + n) : (type + ':' + n);
+}
+
+(async function _initFolderMapCache() {
+    try {
+        const res = await fetch(PLAYER_WORKER_URL + '/folder-map/list');
+        const maps = await res.json();
+        maps.forEach(entry => {
+            // Store under artist-qualified key when artist is present
+            if (entry.artist) _folderMapCache.set(_fmapMakeKey(entry.type, entry.name, entry.artist), entry);
+            // Always also store under name-only key as fallback (last writer wins for duplicates)
+            _folderMapCache.set(_fmapMakeKey(entry.type, entry.name, ''), entry);
+        });
+    } catch (_) {}
+    _folderMapReady = true;
+})();
+
+// Look up by artist+name first, fall back to name-only
+function _checkFolderMapSync(type, name, artist) {
+    if (!name) return null;
+    if (artist) {
+        const hit = _folderMapCache.get(_fmapMakeKey(type, name, artist));
+        if (hit) return hit;
+    }
+    return _folderMapCache.get(_fmapMakeKey(type, name, '')) || null;
+}
+
+// Patch _checkArtistHasFolder to check folder-map first (sync, no fetch)
+const _origCheckArtistHasFolder = _checkArtistHasFolder;
+async function _checkArtistHasFolder(artistName) {
+    const mapped = _checkFolderMapSync('artist', artistName, '');
+    if (mapped) {
+        const result = {
+            folderId: mapped.folderId,
+            folderName: mapped.folderName,
+            path: [{ id: ROOT_ID, name: 'Home' }, { id: mapped.folderId, name: mapped.folderName }]
+        };
+        if (typeof _artistFolderCache !== 'undefined') _artistFolderCache.set(artistName.toLowerCase(), result);
+        return result;
+    }
+    return _origCheckArtistHasFolder(artistName);
+}
+
+// Patch navigateToRealAlbumFolder to check folder-map first (sync, no fetch)
+const _origNavigateToRealAlbumFolder = navigateToRealAlbumFolder;
+async function navigateToRealAlbumFolder(albumName, artistName, trackId) {
+    if (!albumName) return;
+    // Try artist-qualified lookup first, then name-only fallback
+    const mappedAlbum = _checkFolderMapSync('album', albumName, artistName);
+    if (mappedAlbum) {
+        const libraryNavItem = document.querySelector('.nav-item[data-screen="library"]');
+        if (libraryNavItem && !libraryNavItem.classList.contains('active')) nav(libraryNavItem);
+        stack.length = 0;
+        stack.push({ id: ROOT_ID, name: 'Home' });
+        stack.push({ id: mappedAlbum.folderId, name: mappedAlbum.folderName });
+        await loadFolders(mappedAlbum.folderId);
+        showShareToast('Opened: ' + mappedAlbum.folderName, 'success');
+        return;
+    }
+    return _origNavigateToRealAlbumFolder(albumName, artistName, trackId);
+}
 </script>
 </body>
 </html>
