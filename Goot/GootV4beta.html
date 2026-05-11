@@ -24832,11 +24832,69 @@ function applyArtAndColorToUIBatch(trackIds, artBase64, album) {
         }
     });
 }
+// ── YT accent color system ─────────────────────────────────────────────────
+// Defined here (before extractAndApplyColorInstant) so they're in global scope.
+const YT_COLOR_LS_KEY = 'goot_yt_colors_v2';
+function _getYTColorCache() {
+    try { return JSON.parse(localStorage.getItem(YT_COLOR_LS_KEY) || '{}'); }
+    catch(e) { return {}; }
+}
+// Key is "yt::{title}::{artist}" so colors survive video ID changes.
+// Falls back to "yt::id::{videoId}" if no title/artist available.
+function _ytColorKey(title, artist) {
+    const t = (title  || '').trim().toLowerCase();
+    const a = (artist || '').trim().toLowerCase();
+    return t || a ? 'yt::' + t + '::' + a : null;
+}
+function _saveYTColor(colorKey, color) {
+    if (!colorKey) return;
+    try {
+        const cache = _getYTColorCache();
+        cache[colorKey] = color;
+        const keys = Object.keys(cache).filter(k => k !== '_v');
+        if (keys.length > 200) keys.slice(0, keys.length - 200).forEach(k => delete cache[k]);
+        localStorage.setItem(YT_COLOR_LS_KEY, JSON.stringify(cache));
+    } catch(e) {}
+}
+function _applyYTColorForVideo(videoId, thumb, title, artist) {
+    if (!videoId || window._inAlbumColorView) return;
+    const colorKey = _ytColorKey(title, artist) || ('yt::id::' + videoId);
+    const memKey = 'yt__' + videoId;
+    const cached = _getYTColorCache()[colorKey];
+    if (cached) {
+        applyAccentColorTemp(cached === 'grayscale' ? '#707070' : cached);
+        albumColorCache.set(memKey, cached);
+        return;
+    }
+    const _applyResult = (color) => {
+        const result = color || 'grayscale';
+        _saveYTColor(colorKey, result);
+        albumColorCache.set(memKey, result);
+        if (!window._inAlbumColorView) applyAccentColorTemp(result === 'grayscale' ? '#707070' : result);
+    };
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => _applyResult(findMostCommonVibrantColor(img));
+    img.onerror = () => {
+        fetch(thumb + (thumb.includes('?') ? '&' : '?') + '_cb=' + Date.now(), { mode: 'cors' })
+            .then(r => r.blob())
+            .then(blob => {
+                const blobUrl = URL.createObjectURL(blob);
+                const blobImg = new Image();
+                blobImg.onload = () => { _applyResult(findMostCommonVibrantColor(blobImg)); setTimeout(() => URL.revokeObjectURL(blobUrl), 10000); };
+                blobImg.src = blobUrl;
+            })
+            .catch(() => {});
+    };
+    img.src = thumb;
+}
+// ──────────────────────────────────────────────────────────────────────────────
 var _colorExtractInFlight = new Set();
 function extractAndApplyColorInstant(artBase64, album) {
     if (!_albumColorEnabled) return;
     if (window._inAlbumColorView) return;
-    // YT tracks use album='YouTube' — never touch the worker for this; route to the YT color system
+    // YT tracks use album='YouTube' — never touch IDB/worker for this key.
+    // Route to the dedicated YT client-side color system instead.
     if (album === 'YouTube') {
         const t = queue[qIndex];
         if (t?._isYT || t?.id?.startsWith('__yt__')) {
@@ -42319,59 +42377,6 @@ async function ytLoad(videoId, meta) {
     if (_dePanel && !_dePanel.classList.contains('collapsed')) {
       _ytSyncExpandedView(true);
     }
-const YT_COLOR_LS_KEY = 'goot_yt_colors_v2';
-function _getYTColorCache() {
-    try { return JSON.parse(localStorage.getItem(YT_COLOR_LS_KEY) || '{}'); }
-    catch(e) { return {}; }
-}
-// Key is "yt::{title}::{artist}" so colors survive video ID changes
-function _ytColorKey(title, artist) {
-    const t = (title  || '').trim().toLowerCase();
-    const a = (artist || '').trim().toLowerCase();
-    return t || a ? 'yt::' + t + '::' + a : null;
-}
-function _saveYTColor(colorKey, color) {
-    if (!colorKey) return;
-    try {
-        const cache = _getYTColorCache();
-        cache[colorKey] = color;
-        const keys = Object.keys(cache).filter(k => k !== '_v');
-        if (keys.length > 200) keys.slice(0, keys.length - 200).forEach(k => delete cache[k]);
-        localStorage.setItem(YT_COLOR_LS_KEY, JSON.stringify(cache));
-    } catch(e) {}
-}
-function _applyYTColorForVideo(videoId, thumb, title, artist) {
-    if (!videoId || window._inAlbumColorView) return;
-    const colorKey = _ytColorKey(title, artist) || ('yt::id::' + videoId);
-    const memKey = 'yt__' + videoId;
-    const cached = _getYTColorCache()[colorKey];
-    if (cached) {
-        applyAccentColorTemp(cached === 'grayscale' ? '#707070' : cached);
-        albumColorCache.set(memKey, cached);
-        return;
-    }
-    const _applyResult = (color) => {
-        const result = color || 'grayscale';
-        _saveYTColor(colorKey, result);
-        albumColorCache.set(memKey, result);
-        if (!window._inAlbumColorView) applyAccentColorTemp(result === 'grayscale' ? '#707070' : result);
-    };
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => _applyResult(findMostCommonVibrantColor(img));
-    img.onerror = () => {
-        fetch(thumb + (thumb.includes('?') ? '&' : '?') + '_cb=' + Date.now(), { mode: 'cors' })
-            .then(r => r.blob())
-            .then(blob => {
-                const blobUrl = URL.createObjectURL(blob);
-                const blobImg = new Image();
-                blobImg.onload = () => { _applyResult(findMostCommonVibrantColor(blobImg)); setTimeout(() => URL.revokeObjectURL(blobUrl), 10000); };
-                blobImg.src = blobUrl;
-            })
-            .catch(() => {});
-    };
-    img.src = thumb;
-}
     if (meta.thumb && !window._inAlbumColorView) {
       _applyYTColorForVideo(videoId, meta.thumb, meta.title, meta.author || meta.artist);
     }
