@@ -3297,6 +3297,16 @@
 			margin-left: 2px;
 			color: white !important;
 		}
+		/* ── Track-loading state ── */
+		/* Active queue item pulses while audio is buffering */
+		body.track-loading .queue-item.active {
+			animation: goot-queue-loading-pulse 1.1s ease-in-out infinite !important;
+		}
+		@keyframes goot-queue-loading-pulse {
+			0%   { opacity: 0.5; }
+			50%  { opacity: 1;   }
+			100% { opacity: 0.5; }
+		}
 		.player-bar-play-btn:hover {
 			box-shadow:
 				0 6px 20px color-mix(in srgb, var(--md-sys-color-primary) 55%, transparent),
@@ -18722,7 +18732,13 @@ function getDriveVideoThumbnail(fileId, width = 320, height = 180) {
 }
 function getAlbumArtForTrack(track) {
     if (!track) return '';
-    if (track._isYT) return track.albumArt || '';
+    if (track._isYT) {
+        // Prefer stored albumArt; fall back to ytimg URL derived from the video ID.
+        if (track.albumArt) return track.albumArt;
+        const ytId = track._ytVideoId || (track.id && track.id.startsWith('__yt__') ? track.id.slice('__yt__'.length) : null);
+        if (ytId && !ytId.startsWith('__drv__')) return `https://i.ytimg.com/vi/${ytId}/mqdefault.jpg`;
+        return '';
+    }
     if (track._isVideo || track._isDriveVideo) {
         const rawId = track._driveId || (track.id.startsWith('__drv__') ? track.id.slice(7) : track.id);
         const existing = track.albumArt || trackMetadata[track.id]?.albumArt;
@@ -22107,8 +22123,9 @@ async function loadMetadataFromDatabase(trackIds, options = {}) {
     const source = options.source || 'unknown';
     const startTime = performance.now();
     const uncachedIds = options.forceRefresh
-        ? trackIds
+        ? trackIds.filter(id => !id.startsWith('__yt__')) // never fetch YT IDs from worker
         : trackIds.filter(id => {
+            if (id.startsWith('__yt__')) return false; // YT tracks self-contain metadata
             const cached = trackMetadata[id];
             return !cached || !cached.title || cached.title === 'Loading...' || cached.title === 'Unknown Title';
         });
@@ -22934,6 +22951,9 @@ function loadQueueMetadataInBackground(filteredQueue) {
     const albumsInQueue = new Map();
     const itemsNeedingArt = [];
     const tracksMissingMeta = filteredQueue.filter(t => {
+        // YT tracks carry their own metadata on the track object — never send them
+        // to the worker's /metadata/folder endpoint (they'd just fire useless requests).
+        if (t._isYT || (t.id && t.id.startsWith('__yt__'))) return false;
         const m = trackMetadata[t.id];
         return !m || !m.title || m.title === '...' || m.title === 'Loading...';
     });
@@ -22945,6 +22965,8 @@ function loadQueueMetadataInBackground(filteredQueue) {
             albumsInQueue.set(albumKey, []);
         }
         albumsInQueue.get(albumKey).push(t.id);
+        // YT tracks always resolve art from ytimg — skip them from the worker art batch.
+        if (t._isYT || (t.id && t.id.startsWith('__yt__'))) return;
         const hasArt = m.albumArt || tempArtCache[t.id] || albumArtCache[album];
         if (!hasArt && album !== 'Unknown' && !albumsWithArtLoaded.has(album)) {
             itemsNeedingArt.push(t.id);
@@ -23136,6 +23158,41 @@ function setupQueueEventDelegation(container) {
         }
     };
     container.addEventListener('mouseover', container._queueHoverHandler, { passive: true });
+}
+/**
+ * Immediately reflect a track switch in the queue and now-playing bar before
+ * the audio actually starts playing, so the UI never lags behind the click.
+ * Puts the play button into a spinner loading state until `clearTrackLoading`
+ * is called (or the audio fires canplay / play / error).
+ */
+let _trackLoadingTimer = null;
+function _setPlayIcons(cls) {
+    const pi  = document.getElementById('playIcon');
+    const dpi = document.getElementById('dePlayIcon');
+    const fpi = document.getElementById('fsPlayIcon');
+    if (pi)  pi.className  = cls;
+    if (dpi) dpi.className = cls;
+    if (fpi) fpi.className = cls;
+}
+function setTrackLoading(idx) {
+    // Move the queue highlight immediately so it doesn't lag behind the click
+    updateQueueActiveState(idx);
+    // Swap all three play icons to a spinning circle-notch
+    _setPlayIcons('fa-solid fa-circle-notch fa-spin');
+    // Add body class for the queue-item pulse animation
+    document.body.classList.add('track-loading');
+    // Safety valve — clear after 8 s even if audio never fires canplay/play
+    clearTimeout(_trackLoadingTimer);
+    _trackLoadingTimer = setTimeout(clearTrackLoading, 8000);
+}
+function clearTrackLoading() {
+    clearTimeout(_trackLoadingTimer);
+    document.body.classList.remove('track-loading');
+    // Restore icon to pause (audio is playing) or play (stopped/errored).
+    // We check the actual player state so we get the right icon in both cases.
+    const _isPlaying = (typeof currentPlayer !== 'undefined' && currentPlayer && !currentPlayer.paused)
+        || (typeof isYTMode !== 'undefined' && isYTMode);
+    _setPlayIcons(_isPlaying ? 'fa-solid fa-pause' : 'fa-solid fa-play');
 }
 function updateQueueActiveState(newIndex) {
     requestAnimationFrame(() => {
@@ -24413,6 +24470,7 @@ async function loadQueueMetadataFromDatabase(trackIds) {
             const m = trackMetadata[t.id] || {};
             const album = m.album || 'Unknown';
             if (album === 'Unknown') return;
+            if (t._isYT || (t.id && t.id.startsWith('__yt__'))) return; // YT art comes from ytimg
             const albumKey = generateAlbumKey(m.artist, album);
             if (!albumsInQueue.has(albumKey)) albumsInQueue.set(albumKey, []);
             albumsInQueue.get(albumKey).push(t.id);
@@ -24778,6 +24836,15 @@ var _colorExtractInFlight = new Set();
 function extractAndApplyColorInstant(artBase64, album) {
     if (!_albumColorEnabled) return;
     if (window._inAlbumColorView) return;
+    // YT tracks use album='YouTube' — never touch the worker for this; route to the YT color system
+    if (album === 'YouTube') {
+        const t = queue[qIndex];
+        if (t?._isYT || t?.id?.startsWith('__yt__')) {
+            const videoId = t._ytVideoId || (t.id?.startsWith('__yt__') ? t.id.slice('__yt__'.length) : null);
+            if (videoId && artBase64) _applyYTColorForVideo(videoId, artBase64, t.title, t.artist);
+        }
+        return;
+    }
     const _isYTColor = album && album.startsWith('yt__');
     const _isDrvColor = album && album.startsWith('drv__');
     const _sessionOnly = _isYTColor || _isDrvColor;
@@ -25073,6 +25140,9 @@ function play(idxOrId) {
     const t = queue[idx];
     lastTrackedPosition = {};
     qIndex = idx;
+    // Immediately mark the queue item active and spin the play button so the
+    // UI reflects the selection before the audio stream is ready.
+    setTrackLoading(idx);
     startQueueArtObserver(t.id);
     if (lastfm) {
         lastfm.resetScrobbleState();
@@ -32879,12 +32949,60 @@ function playMostPlayedTrack(trackId) {
         if (!trackMetadata[trackId] || trackMetadata[trackId].title === 'YouTube Video' || !trackMetadata[trackId].title) {
             trackMetadata[trackId] = _ytFakeTrack;
         }
-        const _existIdx = queue.findIndex(t => t.id === trackId);
-        if (_existIdx === -1) {
-            cancelQueuePrefetch();
-            queue = [_ytFakeTrack];
-            qIndex = 0;
+        // Build the same unified queue as regular tracks (all play history, sorted by play count)
+        // so clicking a video gives the same full Listen Again queue as clicking a regular song.
+        function resolveAnyTrack(id) {
+            const meta = trackMetadata[id] || {};
+            const queueTrack = queue.find(t => t.id === id);
+            if (id.startsWith('__yt__')) {
+                const ytVid = id.slice('__yt__'.length);
+                return {
+                    id,
+                    title:    meta.title  || queueTrack?.title  || '',
+                    artist:   meta.artist || queueTrack?.artist || '',
+                    album:    'YouTube',
+                    albumArt: meta.albumArt || queueTrack?.albumArt || `https://i.ytimg.com/vi/${ytVid}/mqdefault.jpg`,
+                    _isYT:    true,
+                    _ytVideoId: ytVid,
+                    playCount: _normPC(playCounts[id]).c || 0,
+                };
+            }
+            const album = meta?.album || queueTrack?.album || '';
+            const cachedArt = (album && album !== 'Unknown' && albumArtCache[album]) ? albumArtCache[album] : '';
+            return {
+                id,
+                title:     meta?.title     || queueTrack?.title     || queueTrack?.name  || 'Unknown Track',
+                artist:    meta?.artist    || queueTrack?.artist    || queueTrack?.artistName || 'Unknown Artist',
+                album,
+                albumArt:  meta?.albumArt  || meta?.art || cachedArt || queueTrack?.albumArt || queueTrack?.art || '',
+                path:      meta?.path      || queueTrack?.path      || '',
+                googleUrl: meta?.googleUrl || queueTrack?.googleUrl || queueTrack?.url   || '',
+                playCount: _normPC(playCounts[id]).c || 0,
+            };
         }
+        const _allTracks = [];
+        Object.keys(playCounts).forEach(id => {
+            const count = _normPC(playCounts[id]).c;
+            if (count > 0) _allTracks.push(resolveAnyTrack(id));
+        });
+        _allTracks.sort((a, b) => b.playCount - a.playCount);
+        if (!_allTracks.find(t => t.id === trackId)) _allTracks.unshift(_ytFakeTrack);
+        cancelQueuePrefetch();
+        const _ytNewIds = _allTracks.map(t => t.id).join(',');
+        const _ytCurIds = currentQueueSource === 'most-played' ? queue.map(t => t.id).join(',') : '';
+        if (_ytNewIds === _ytCurIds) {
+            qIndex = queue.findIndex(t => t.id === trackId);
+        } else {
+            queue = [..._allTracks];
+            qIndex = _allTracks.findIndex(t => t.id === trackId);
+        }
+        currentQueueSource = 'most-played';
+        // Reflect the selection in the queue and now-playing bar immediately,
+        // before ytLoad resolves the stream (which can take a second or two).
+        updateNowPlayingWithData(_ytFakeTrack);
+        updateQueueActiveState(qIndex);
+        renderQueue();
+        setTrackLoading(qIndex); // spinner on play button until video fires 'play'
         ytLoad(_ytVideoId, { title: _ytFakeTrack.title, author: _ytFakeTrack.artist, thumb: _thumb, videoId: _ytVideoId });
         return;
     }
@@ -34359,6 +34477,7 @@ document.addEventListener('input', (e) => {
 player.addEventListener('progress', updateBuffer);
 player.onplay = () => {
     if (currentPlayer !== player) return;
+    clearTrackLoading(); // audio is actually playing — remove spinner
     if (audioContext && audioContext.state === 'suspended') {
         audioContext.resume();
     }
@@ -34424,6 +34543,7 @@ player.onpause = () => {
 };
 player2.onplay = () => {
     if (currentPlayer !== player2) return;
+    clearTrackLoading(); // audio is actually playing — remove spinner
     if (audioContext && audioContext.state === 'suspended') {
         audioContext.resume();
     }
@@ -34486,6 +34606,12 @@ player2.onpause = () => {
 };
 player.addEventListener('seeking', () => { if (lastfm) lastfm._lastListenTimestamp = null; });
 player2.addEventListener('seeking', () => { if (lastfm) lastfm._lastListenTimestamp = null; });
+// Show spinner during network stalls (waiting) and clear it when data resumes (canplay/playing)
+[player, player2].forEach(p => {
+    p.addEventListener('waiting',  () => { if (currentPlayer === p) { _setPlayIcons('fa-solid fa-circle-notch fa-spin'); document.body.classList.add('track-loading'); } });
+    p.addEventListener('canplay',  () => { if (currentPlayer === p) clearTrackLoading(); });
+    p.addEventListener('error',    () => { if (currentPlayer === p) clearTrackLoading(); });
+});
 player.onended = () => {
     if (isCrossfading || currentPlayer !== player) return;
     if (typeof _isPartyGuest === 'function' && _isPartyGuest()) return;
@@ -35792,6 +35918,32 @@ async function _routeShareToken(q, type, isEnter) {
     }
     if (type === 'share-track') {
         const trackId = q.slice(SHARE_TOKEN_TRACK_PREFIX.length).trim();
+        // ── YouTube video share ──────────────────────────────────────────────
+        if (trackId.startsWith('__yt__') && typeof ytLoad === 'function') {
+            const videoId = trackId.slice('__yt__'.length);
+            if (!videoId) { showShareToast('Invalid YouTube share token', 'error'); return true; }
+            closeTopSearchDropdown();
+            const _meta = trackMetadata[trackId] || {};
+            const _thumb = _meta.albumArt || `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`;
+            showShareToast('Loading YouTube video…');
+            ytLoad(videoId, {
+                videoId,
+                title:  _meta.title  || 'YouTube Video',
+                author: _meta.artist || 'YouTube',
+                thumb:  _thumb,
+            });
+            return true;
+        }
+        // ── Google Drive video share ─────────────────────────────────────────
+        if (trackId.startsWith('__drv__') && typeof driveVideoLoad === 'function') {
+            const driveId = trackId.slice('__drv__'.length);
+            if (!driveId) { showShareToast('Invalid Drive share token', 'error'); return true; }
+            closeTopSearchDropdown();
+            showShareToast('Loading Drive video…');
+            driveVideoLoad(driveId);
+            return true;
+        }
+        // ── Regular Drive audio track ────────────────────────────────────────
         if (!_RAW_DRIVE_ID.test(trackId)) {
             showShareToast('Invalid track share token', 'error');
             return true;
@@ -41979,7 +42131,13 @@ async function ytLoad(videoId, meta) {
       _isYT:    true,
       _ytVideoId: videoId,
     };
-    if (typeof trackMetadata !== 'undefined') trackMetadata[_fakeId] = _earlyMeta;
+    if (typeof trackMetadata !== 'undefined') {
+      trackMetadata[_fakeId] = _earlyMeta;
+      // Eagerly persist so title/thumb are in IDB even if the user never plays it.
+      if (typeof saveCompleteTrackMetadata === 'function') {
+        saveCompleteTrackMetadata(_fakeId, _earlyMeta).catch(() => {});
+      }
+    }
   }
   const wrap = document.getElementById('ytPlayerWrap');
   const empty = document.getElementById('ytEmpty');
@@ -42112,6 +42270,12 @@ async function ytLoad(videoId, meta) {
     await _ytStartDASH(_ytQualActive);
     } // end else (adaptive/DASH path)
     isYTMode = true;
+    // Clear the play-button loading spinner once the YT video actually starts playing.
+    const _ytVidElForClear = document.getElementById('ytVideo');
+    if (_ytVidElForClear) {
+        _ytVidElForClear.addEventListener('play',  () => clearTrackLoading(), { once: true });
+        _ytVidElForClear.addEventListener('error', () => clearTrackLoading(), { once: true });
+    }
     if (typeof currentPlayer !== 'undefined' && currentPlayer) {
       currentPlayer.pause();
     }
@@ -42127,6 +42291,10 @@ async function ytLoad(videoId, meta) {
     };
     if (typeof trackMetadata !== 'undefined') {
       trackMetadata[fakeId] = { ...fakeTrack, album: 'YouTube' };
+      // Persist title/creator/thumb to IDB immediately so they survive page reload.
+      if (typeof saveCompleteTrackMetadata === 'function') {
+        saveCompleteTrackMetadata(fakeId, trackMetadata[fakeId]).catch(() => {});
+      }
     }
     const existingIdx = queue.findIndex(t => t.id === fakeId);
     if (existingIdx >= 0) {
@@ -42151,58 +42319,53 @@ async function ytLoad(videoId, meta) {
     if (_dePanel && !_dePanel.classList.contains('collapsed')) {
       _ytSyncExpandedView(true);
     }
-const YT_COLOR_LS_KEY = 'goot_yt_colors_v1';
+const YT_COLOR_LS_KEY = 'goot_yt_colors_v2';
 function _getYTColorCache() {
     try { return JSON.parse(localStorage.getItem(YT_COLOR_LS_KEY) || '{}'); }
     catch(e) { return {}; }
 }
-function _saveYTColor(videoId, color) {
+// Key is "yt::{title}::{artist}" so colors survive video ID changes
+function _ytColorKey(title, artist) {
+    const t = (title  || '').trim().toLowerCase();
+    const a = (artist || '').trim().toLowerCase();
+    return t || a ? 'yt::' + t + '::' + a : null;
+}
+function _saveYTColor(colorKey, color) {
+    if (!colorKey) return;
     try {
         const cache = _getYTColorCache();
-        cache[videoId] = color;
+        cache[colorKey] = color;
         const keys = Object.keys(cache).filter(k => k !== '_v');
-        if (keys.length > 200) {
-            keys.slice(0, keys.length - 200).forEach(k => delete cache[k]);
-        }
+        if (keys.length > 200) keys.slice(0, keys.length - 200).forEach(k => delete cache[k]);
         localStorage.setItem(YT_COLOR_LS_KEY, JSON.stringify(cache));
     } catch(e) {}
 }
-function _applyYTColorForVideo(videoId, thumb) {
+function _applyYTColorForVideo(videoId, thumb, title, artist) {
     if (!videoId || window._inAlbumColorView) return;
-    const cached = _getYTColorCache()[videoId];
+    const colorKey = _ytColorKey(title, artist) || ('yt::id::' + videoId);
+    const memKey = 'yt__' + videoId;
+    const cached = _getYTColorCache()[colorKey];
     if (cached) {
         applyAccentColorTemp(cached === 'grayscale' ? '#707070' : cached);
-        albumColorCache.set('yt__' + videoId, cached);
+        albumColorCache.set(memKey, cached);
         return;
     }
+    const _applyResult = (color) => {
+        const result = color || 'grayscale';
+        _saveYTColor(colorKey, result);
+        albumColorCache.set(memKey, result);
+        if (!window._inAlbumColorView) applyAccentColorTemp(result === 'grayscale' ? '#707070' : result);
+    };
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    const doExtract = () => {
-        const color = findMostCommonVibrantColor(img);
-        const result = color || 'grayscale';
-        _saveYTColor(videoId, result);
-        albumColorCache.set('yt__' + videoId, result);
-        if (!window._inAlbumColorView) {
-            applyAccentColorTemp(result === 'grayscale' ? '#707070' : result);
-        }
-    };
-    img.onload = doExtract;
+    img.onload = () => _applyResult(findMostCommonVibrantColor(img));
     img.onerror = () => {
         fetch(thumb + (thumb.includes('?') ? '&' : '?') + '_cb=' + Date.now(), { mode: 'cors' })
             .then(r => r.blob())
             .then(blob => {
                 const blobUrl = URL.createObjectURL(blob);
                 const blobImg = new Image();
-                blobImg.onload = () => {
-                    const color = findMostCommonVibrantColor(blobImg);
-                    const result = color || 'grayscale';
-                    _saveYTColor(videoId, result);
-                    albumColorCache.set('yt__' + videoId, result);
-                    if (!window._inAlbumColorView) {
-                        applyAccentColorTemp(result === 'grayscale' ? '#707070' : result);
-                    }
-                    setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
-                };
+                blobImg.onload = () => { _applyResult(findMostCommonVibrantColor(blobImg)); setTimeout(() => URL.revokeObjectURL(blobUrl), 10000); };
                 blobImg.src = blobUrl;
             })
             .catch(() => {});
@@ -42210,7 +42373,7 @@ function _applyYTColorForVideo(videoId, thumb) {
     img.src = thumb;
 }
     if (meta.thumb && !window._inAlbumColorView) {
-      _applyYTColorForVideo(videoId, meta.thumb);
+      _applyYTColorForVideo(videoId, meta.thumb, meta.title, meta.author || meta.artist);
     }
     const videoEl2 = document.getElementById('ytVideo');
     videoEl2.ontimeupdate = _ytTimeUpdate;
@@ -43687,6 +43850,24 @@ async function toggle8D() {
             if (el) { el.style.opacity = '0'; el.style.transition = 'opacity 0.2s'; setTimeout(function(){ el.remove(); }, 220); }
         }
         function doPlay() {
+            // ── YouTube video ────────────────────────────────────────────────
+            if (trackId.startsWith('__yt__') && typeof ytLoad === 'function') {
+                var videoId = trackId.slice('__yt__'.length);
+                var _m = (typeof trackMetadata !== 'undefined' && trackMetadata[trackId]) || {};
+                ytLoad(videoId, {
+                    videoId: videoId,
+                    title:  _m.title  || document.getElementById('goot-launch-title')?.textContent || 'YouTube Video',
+                    author: _m.artist || document.getElementById('goot-launch-artist')?.textContent || 'YouTube',
+                    thumb:  _m.albumArt || 'https://i.ytimg.com/vi/' + videoId + '/mqdefault.jpg',
+                });
+                return;
+            }
+            // ── Drive video ──────────────────────────────────────────────────
+            if (trackId.startsWith('__drv__') && typeof driveVideoLoad === 'function') {
+                driveVideoLoad(trackId.slice('__drv__'.length));
+                return;
+            }
+            // ── Regular Drive audio ──────────────────────────────────────────
             if (typeof playTrackById === 'function') {
                 playTrackById(trackId).then(function(ok) {
                     if (!ok && typeof showShareToast === 'function') showShareToast('Track not found', 'error');
@@ -43707,6 +43888,26 @@ async function toggle8D() {
             }
         });
         function tryPopulate(attempts) {
+            // ── YouTube — use cached metadata + ytimg thumbnail directly ────
+            if (trackId.startsWith('__yt__')) {
+                var videoId = trackId.slice('__yt__'.length);
+                var _m = (typeof trackMetadata !== 'undefined' && trackMetadata[trackId]) || {};
+                var titleEl = document.getElementById('goot-launch-title');
+                var artistEl = document.getElementById('goot-launch-artist');
+                var labelEl  = document.getElementById('goot-launch-label');
+                if (titleEl) titleEl.textContent  = _m.title  || 'YouTube Video';
+                if (artistEl) artistEl.textContent = _m.artist || 'YouTube';
+                if (labelEl)  labelEl.textContent  = 'YouTube Video';
+                var img = document.getElementById('goot-launch-art');
+                var placeholder = document.getElementById('goot-launch-art-placeholder');
+                if (img) {
+                    var thumbUrl = _m.albumArt || 'https://i.ytimg.com/vi/' + videoId + '/hqdefault.jpg';
+                    img.onload = function() { img.classList.add('loaded'); if (placeholder) placeholder.style.display = 'none'; };
+                    img.src = thumbUrl;
+                }
+                if (placeholder) placeholder.textContent = '▶';
+                return;
+            }
             var workerUrl = typeof PLAYER_WORKER_URL !== 'undefined' ? PLAYER_WORKER_URL : 'https://gootapimask.goot-api.workers.dev';
             fetch(workerUrl + '/metadata/track/' + trackId)
                 .then(function(r){ return r.ok ? r.json() : null; })
