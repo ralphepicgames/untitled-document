@@ -2085,19 +2085,17 @@ async function _launchGameOverlay(fileName, baseUrl, isPNG, gameName) {
 
             const consoleInject = '<script>' +
             '(function(){' +
-            'var lg=parent.addLog;' +
-            'if(!lg)return;' +
-            'var c=["log","error","warn","info","debug","table","trace","dir","clear"];' +
-            'c.forEach(function(m){var o=console[m];console[m]=function(){lg.call(null,Array.from(arguments).join(" "),m);o.apply(console,arguments)}});' +
+            'var _w=typeof opener!=="undefined"&&opener?opener:parent;' +
+            'function lg(msg,type){' +
+            'try{_w.postMessage({__untdocLog:true,message:msg,type:type||"info"},"*")}catch(e){}' +
+            '}' +
+            'var c=["log","error","warn","info","debug","table","trace","dir"];' +
+            'c.forEach(function(m){var o=console[m];console[m]=function(){lg(Array.from(arguments).join(" "),m==="log"?"info":m);o.apply(console,arguments)}});' +
             'window.onerror=function(m,u,l,c){lg("Error: "+m+" ("+u+":"+l+":"+c+")","error");return false};' +
-            'window.onunhandledrejection=function(e){lg("Unhandled Rejection: "+e.reason,"error")};' +
+            'window.onunhandledrejection=function(e){lg("Unhandled Rejection: "+(e.reason&&e.reason.message||e.reason),"error")};' +
             'var xo=XMLHttpRequest.prototype.open,xs=XMLHttpRequest.prototype.send;' +
             'XMLHttpRequest.prototype.open=function(m,u){this._u=u;this._m=m;return xo.apply(this,arguments)};' +
             'XMLHttpRequest.prototype.send=function(b){var t=this;this.addEventListener("loadend",function(){lg(t._m+" "+t._u+" "+t.status,"network")});return xs.apply(this,arguments)};' +
-            'var ff=window.fetch;window.fetch=function(i,init){' +
-            'var u=typeof i==="string"?i:(i.url||"");' +
-            'var m=(init&&init.method)||"GET";' +
-            'return ff.apply(this,arguments).then(function(r){lg(m+" "+u+" "+r.status,"network");return r})["catch"](function(e){lg(m+" "+u+" FAILED: "+e.message,"error");throw e})};' +
             '})();' +
             '<\/script>';
 
@@ -2105,6 +2103,7 @@ async function _launchGameOverlay(fileName, baseUrl, isPNG, gameName) {
             '(function(){' +
             'var _b=' + JSON.stringify(baseHref) + ';' +
             'var _r=' + JSON.stringify(rootHref) + ';' +
+            'var _w2=typeof opener!=="undefined"&&opener?opener:parent;' +
             'function _u(url){' +
             'if(typeof url!=="string")return url;' +
             'if(url.startsWith("http://")||url.startsWith("https://")||url.startsWith("//")||url.startsWith("data:")||url.startsWith("blob:"))return url;' +
@@ -2114,13 +2113,15 @@ async function _launchGameOverlay(fileName, baseUrl, isPNG, gameName) {
             'var _f=window.fetch;window.fetch=function(i,init){' +
             'if(typeof i==="string")i=_u(i);' +
             'else if(i instanceof Request){var r=_u(i.url);if(r!==i.url)i=new Request(r,i)}' +
-            'return _f.call(this,i,init)};' +
+            'var _u2=typeof i==="string"?i:(i.url||"");' +
+            'var _m2=(init&&init.method)||"GET";' +
+            'return _f.call(this,i,init).then(function(r){try{_w2.postMessage({__untdocLog:true,message:_m2+" "+_u2+" "+r.status,type:"network"},"*")}catch(e){}return r})["catch"](function(e){try{_w2.postMessage({__untdocLog:true,message:_m2+" "+_u2+" FAILED: "+e.message,type:"error"},"*")}catch(e2){}throw e})};' +
             'var _o=XMLHttpRequest.prototype.open;' +
             'XMLHttpRequest.prototype.open=function(m,u,a,u2,p){return _o.call(this,m,_u(u),a!==undefined?a:true,u2,p)};' +
             '})();' +
             '<\/script>';
 
-            const patchScript = urlPatch + consoleInject;
+            const patchScript = consoleInject + urlPatch;
 
             if (!/<base[\s>]/i.test(html)) {
                 if (/<head[\s>]/i.test(html)) {
@@ -2134,6 +2135,30 @@ async function _launchGameOverlay(fileName, baseUrl, isPNG, gameName) {
                 } else {
                     html = patchScript + html;
                 }
+            }
+
+            if (baseUrl === seraphBaseUrl && /<\/body>/i.test(html)) {
+                const ruffleFixScript = '<script>(async function(){' +
+                    'if(!window.RufflePlayer)return;' +
+                    'var swfUrl=null;' +
+                    'var el=document.querySelector("embed[src*=\'.swf\'],object[data*=\'.swf\']");' +
+                    'if(el)swfUrl=el.getAttribute("src")||el.getAttribute("data");' +
+                    'if(!swfUrl){var scripts=document.querySelectorAll("script");for(var s of scripts){var m=s.textContent.match(/embedSWF\\s*\\(\\s*["\']([^"\']+\\.swf)/i);if(m){swfUrl=m[1];break;}var m2=s.textContent.match(/player\\.load\\s*\\(\\s*\\{[^}]*url\\s*:\\s*["\']([^"\']+)/i);if(m2){swfUrl=m2[1];break;}}}' +
+                    'if(!swfUrl)return;' +
+                    'if(!swfUrl.startsWith("http"))swfUrl=new URL(swfUrl,_b).href;' +
+                    'try{' +
+                    'var resp=await fetch(swfUrl);' +
+                    'var data=new Uint8Array(await resp.arrayBuffer());' +
+                    'var ruffle=window.RufflePlayer.newest();' +
+                    'var player=ruffle.createPlayer();' +
+                    'player.style.cssText="position:fixed;inset:0;width:100%;height:100%;";' +
+                    'document.body.innerHTML="";' +
+                    'document.body.style.margin="0";' +
+                    'document.body.appendChild(player);' +
+                    'player.load({data:data});' +
+                    '}catch(e){}' +
+                    '})();<\/script>';
+                html = html.replace(/<\/body>/i, ruffleFixScript + '</body>');
             }
 
             frame.contentDocument.open();
@@ -2367,6 +2392,13 @@ async function _launchGameOverlay(fileName, baseUrl, isPNG, gameName) {
         renderLogs();
     }
 
+    // Accept log messages from games in new tabs or iframes via postMessage
+    window.addEventListener('message', function(e) {
+        if (e.data && e.data.__untdocLog) {
+            addLog(e.data.message, e.data.type);
+        }
+    });
+
     function escapeHtml(text) {
         var d = document.createElement('div');
         d.textContent = text;
@@ -2487,15 +2519,21 @@ function applyDevOptions() {
 
 // Load saved dev settings on startup
 (function loadDevSettings() {
-    var newTabOn = true;
-    var consolOn = localStorage.getItem('untdoc_dev_console') === 'true';
-    document.getElementById('devOpenNewTab').checked = newTabOn;
-    document.getElementById('devShowConsole').checked = consolOn;
-    // Apply console button visibility once DOM is ready
-    setTimeout(function() {
+    function applySettings() {
+        var newTabOn = true;
+        var consolOn = localStorage.getItem('untdoc_dev_console') === 'true';
+        var elNewTab = document.getElementById('devOpenNewTab');
+        var elConsol = document.getElementById('devShowConsole');
+        if (elNewTab) elNewTab.checked = newTabOn;
+        if (elConsol) elConsol.checked = consolOn;
         var consoleBtn = document.querySelector('#gameOverlayToolbar button[onclick="toggleConsole()"]');
         if (consoleBtn) consoleBtn.style.display = consolOn ? '' : 'none';
-    }, 0);
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', applySettings);
+    } else {
+        applySettings();
+    }
 })();
 
 // Patch launchGame to respect dev options
@@ -2541,6 +2579,30 @@ async function launchGame(fileName, baseUrl, isPNG, gameName) {
                 } else {
                     if (/<head[\s>]/i.test(html)) html = html.replace(/(<head[^>]*>)/i, '$1' + patchScript);
                     else html = patchScript + html;
+                }
+
+                if (baseUrl === seraphBaseUrl && /<\/body>/i.test(html)) {
+                    var ruffleFixScript = '<script>(async function(){' +
+                        'if(!window.RufflePlayer)return;' +
+                        'var swfUrl=null;' +
+                        'var el=document.querySelector("embed[src*=\'.swf\'],object[data*=\'.swf\']");' +
+                        'if(el)swfUrl=el.getAttribute("src")||el.getAttribute("data");' +
+                        'if(!swfUrl){var scripts=document.querySelectorAll("script");for(var s of scripts){var m=s.textContent.match(/embedSWF\\s*\\(\\s*["\']([^"\']+\\.swf)/i);if(m){swfUrl=m[1];break;}var m2=s.textContent.match(/player\\.load\\s*\\(\\s*\\{[^}]*url\\s*:\\s*["\']([^"\']+)/i);if(m2){swfUrl=m2[1];break;}}}' +
+                        'if(!swfUrl)return;' +
+                        'if(!swfUrl.startsWith("http"))swfUrl=new URL(swfUrl,_base).href;' +
+                        'try{' +
+                        'var resp=await fetch(swfUrl);' +
+                        'var data=new Uint8Array(await resp.arrayBuffer());' +
+                        'var ruffle=window.RufflePlayer.newest();' +
+                        'var player=ruffle.createPlayer();' +
+                        'player.style.cssText="position:fixed;inset:0;width:100%;height:100%;";' +
+                        'document.body.innerHTML="";' +
+                        'document.body.style.margin="0";' +
+                        'document.body.appendChild(player);' +
+                        'player.load({data:data});' +
+                        '}catch(e){}' +
+                        '})();<\/script>';
+                    html = html.replace(/<\/body>/i, ruffleFixScript + '</body>');
                 }
 
                 win.document.open();
