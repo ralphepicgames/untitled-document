@@ -1438,7 +1438,6 @@
             }
         }
 </style>
-<base target="_blank">
 </head>
 <body>
 
@@ -1539,6 +1538,31 @@
                </div>
            </div>
        </div>
+   </div>
+</div>
+
+<div id="consoleOverlay" onclick="toggleConsole()"></div>
+<div id="consolePanel">
+   <div class="console-header">
+      <div class="console-title">
+         <span class="material-symbols-outlined" style="font-size:16px">terminal</span>
+         Console
+      </div>
+      <span class="console-hint">~ to close</span>
+   </div>
+   <div class="console-tabs">
+      <button class="console-tab active" data-filter="all" onclick="filterConsoleLogs('all')">All</button>
+      <button class="console-tab" data-filter="error" onclick="filterConsoleLogs('error')">Errors</button>
+      <button class="console-tab" data-filter="warn" onclick="filterConsoleLogs('warn')">Warnings</button>
+      <button class="console-tab" data-filter="info" onclick="filterConsoleLogs('info')">Info</button>
+      <button class="console-tab" data-filter="network" onclick="filterConsoleLogs('network')">Network</button>
+   </div>
+   <div class="console-body" id="consoleBody">
+      <div class="console-empty" id="consoleEmpty">Logs appear here. Press ~ to toggle.</div>
+   </div>
+   <div class="console-footer">
+      <input type="text" id="consoleInput" placeholder="Command..." onkeydown="handleConsoleInput(event)">
+      <button class="console-clear-btn" onclick="clearConsoleLogs()">Clear</button>
    </div>
 </div>
 
@@ -2046,13 +2070,19 @@ function openGame(name) {
 function closeGame() {
     document.getElementById('gameOverlay').classList.remove('active');
     const frame = document.getElementById('gameFrame');
+    iframeConsoleHook = null;
     frame.src = 'about:blank';
+    if (consoleOpen) toggleConsole();
 }
 
 async function _launchGameOverlay(fileName, baseUrl, isPNG, gameName) {
+    consoleLogs.length = 0;
+    iframeConsoleHook = null;
+    renderLogs();
     document.getElementById('loader').classList.add('active');
     const frame = document.getElementById('gameFrame');
     openGame(gameName || fileName);
+    if (!consoleOpen) toggleConsole();
 
     if (isPNG) {
         const fullUrl = baseUrl + fileName;
@@ -2087,15 +2117,28 @@ async function _launchGameOverlay(fileName, baseUrl, isPNG, gameName) {
             '(function(){' +
             'var _w=typeof opener!=="undefined"&&opener?opener:parent;' +
             'function lg(msg,type){' +
-            'try{_w.postMessage({__untdocLog:true,message:msg,type:type||"info"},"*")}catch(e){}' +
+            'try{_w.postMessage({__untdocLog:true,message:String(msg),type:type||"info"},"*")}catch(e){}' +
             '}' +
-            'var c=["log","error","warn","info","debug","table","trace","dir"];' +
-            'c.forEach(function(m){var o=console[m];console[m]=function(){lg(Array.from(arguments).join(" "),m==="log"?"info":m);o.apply(console,arguments)}});' +
-            'window.onerror=function(m,u,l,c){lg("Error: "+m+" ("+u+":"+l+":"+c+")","error");return false};' +
-            'window.onunhandledrejection=function(e){lg("Unhandled Rejection: "+(e.reason&&e.reason.message||e.reason),"error")};' +
-            'var xo=XMLHttpRequest.prototype.open,xs=XMLHttpRequest.prototype.send;' +
-            'XMLHttpRequest.prototype.open=function(m,u){this._u=u;this._m=m;return xo.apply(this,arguments)};' +
-            'XMLHttpRequest.prototype.send=function(b){var t=this;this.addEventListener("loadend",function(){lg(t._m+" "+t._u+" "+t.status,"network")});return xs.apply(this,arguments)};' +
+            'function _wrap(){' +
+            'var c=["log","error","warn","info","debug","table","trace","dir","group","groupEnd","time","timeEnd","count","countReset","assert","clear"];' +
+            'c.forEach(function(m){' +
+            'var o=console[m]||function(){};' +
+            'try{' +
+            'Object.defineProperty(console,m,{value:function(){' +
+            'var args=Array.prototype.slice.call(arguments);' +
+            'var t=m==="log"?"info":m;' +
+            'try{lg(args.map(function(a){try{return typeof a==="object"?JSON.stringify(a,null,2):String(a)}catch(e){return String(a)}}).join(" "),t)}catch(e){}' +
+            'try{return o.apply(console,args)}catch(e){}}' +
+            ',writable:true,configurable:true});' +
+            '}catch(e){console[m]=function(){var args=Array.prototype.slice.call(arguments);var t=m==="log"?"info":m;try{lg(args.map(function(a){try{return typeof a==="object"?JSON.stringify(a,null,2):String(a)}catch(e){return String(a)}}).join(" "),t)}catch(e){}try{return o.apply(console,args)}catch(e){}}}' +
+            '});' +
+            '}' +
+            '_wrap();' +
+            'var _origOnError=window.onerror;' +
+            'window.onerror=function(m,u,l,c,e){lg("Error: "+m+" ("+u+":"+l+":"+c+")","error");if(_origOnError)return _origOnError.apply(this,arguments);return false};' +
+            'var _origOnUnhandled=window.onunhandledrejection;' +
+            'window.onunhandledrejection=function(e){lg("Unhandled Rejection: "+(e.reason&&e.reason.message||e.reason||String(e)),"error");if(_origOnUnhandled)return _origOnUnhandled.apply(this,arguments)};' +
+            'setInterval(_wrap,500);' +
             '})();' +
             '<\/script>';
 
@@ -2164,6 +2207,7 @@ async function _launchGameOverlay(fileName, baseUrl, isPNG, gameName) {
             frame.contentDocument.open();
             frame.contentDocument.write(html);
             frame.contentDocument.close();
+            setTimeout(hookIframeConsole, 100);
         } catch (e) {
             try {
                 addLog('Game failed: ' + e.message, 'error');
@@ -2376,6 +2420,14 @@ async function _launchGameOverlay(fileName, baseUrl, isPNG, gameName) {
         if (consoleOpen) {
             var input = getConsoleEl('consoleInput');
             if (input) setTimeout(function(){ input.focus(); }, 100);
+            updateConsoleBadge();
+            setTimeout(function() {
+                renderLogs();
+                var body = getConsoleEl('consoleBody');
+                if (body && consoleLogs.length === 0) {
+                    addLog('Console UI test - if you see this, the console works', 'info');
+                }
+            }, 300);
         }
     }
 
@@ -2390,12 +2442,83 @@ async function _launchGameOverlay(fileName, baseUrl, isPNG, gameName) {
         consoleLogs.unshift(entry);
         if (consoleLogs.length > 500) consoleLogs.pop();
         renderLogs();
+        updateConsoleBadge();
+    }
+
+    function updateConsoleBadge() {
+        var badge = getConsoleEl('consoleBadge');
+        if (!badge) return;
+        if (!consoleOpen && consoleLogs.length > 0) {
+            badge.style.display = 'inline';
+            badge.textContent = consoleLogs.length > 99 ? '99+' : consoleLogs.length;
+        } else {
+            badge.style.display = 'none';
+        }
     }
 
     // Accept log messages from games in new tabs or iframes via postMessage
     window.addEventListener('message', function(e) {
         if (e.data && e.data.__untdocLog) {
             addLog(e.data.message, e.data.type);
+        }
+    });
+
+    // Direct iframe console hook - polls the iframe's console since contentDocument.write makes it same-origin
+    var iframeConsoleHook = null;
+    var iframeConsoleMethods = ['log','error','warn','info','debug','table','trace','dir','group','groupEnd','time','timeEnd','count','countReset','assert','clear'];
+
+    function hookIframeConsole() {
+        var frame = document.getElementById('gameFrame');
+        if (!frame || !frame.contentWindow) return;
+        try {
+            var win = frame.contentWindow;
+            if (!win || !win.console) return;
+            if (iframeConsoleHook === win) return; // already hooked
+            iframeConsoleHook = win;
+            var _w = window;
+            iframeConsoleMethods.forEach(function(m) {
+                var orig = win.console[m] || function(){};
+                win.console[m] = function() {
+                    var args = Array.prototype.slice.call(arguments);
+                    var type = m === 'log' ? 'info' : m;
+                    var msg = args.map(function(a) {
+                        try { return typeof a === 'object' ? JSON.stringify(a, null, 2) : String(a); }
+                        catch(e) { return String(a); }
+                    }).join(' ');
+                    addLog(msg, type);
+                    try { return orig.apply(win.console, args); } catch(e) {}
+                };
+            });
+            // Hook window.onerror in iframe
+            var origOnError = win.onerror;
+            win.onerror = function(msg, url, line, col, err) {
+                addLog('Error: ' + msg + ' (' + url + ':' + line + ':' + col + ')', 'error');
+                if (origOnError) return origOnError.apply(this, arguments);
+                return false;
+            };
+            var origOnUnhandled = win.onunhandledrejection;
+            win.onunhandledrejection = function(e) {
+                addLog('Unhandled Rejection: ' + (e.reason && e.reason.message || e.reason || String(e)), 'error');
+                if (origOnUnhandled) return origOnUnhandled.apply(this, arguments);
+            };
+        } catch(e) {}
+    }
+
+    // Re-hook when iframe content changes
+    var iframeObserver = setInterval(function() {
+        var frame = document.getElementById('gameFrame');
+        if (frame && frame.contentDocument && frame.contentDocument.readyState === 'complete') {
+            hookIframeConsole();
+        }
+    }, 200);
+
+    // Also hook on iframe load event
+    document.addEventListener('DOMContentLoaded', function() {
+        var frame = document.getElementById('gameFrame');
+        if (frame) {
+            frame.addEventListener('load', function() {
+                setTimeout(hookIframeConsole, 50);
+            });
         }
     });
 
@@ -2406,27 +2529,29 @@ async function _launchGameOverlay(fileName, baseUrl, isPNG, gameName) {
     }
 
     function renderLogs() {
-        var body = getConsoleEl('consoleBody');
-        var empty = getConsoleEl('consoleEmpty');
-        if (!body || !empty) return;
+        var body = document.getElementById('consoleBody');
+        if (!body) return;
+        var empty = document.getElementById('consoleEmpty');
         var filtered = consoleFilter === 'all' ? consoleLogs : consoleLogs.filter(function(l) { return l.type === consoleFilter; });
-        if (filtered.length === 0) {
-            empty.style.display = 'flex';
-            body.innerHTML = '';
-            body.appendChild(empty);
-            return;
-        }
-        empty.style.display = 'none';
-        body.innerHTML = filtered.map(function(l) {
-            var icons = {error:'error',warn:'warning',info:'info',debug:'bug_report',network:'language'};
+        var html = '';
+        var icons = {error:'error',warn:'warning',info:'info',debug:'bug_report',network:'language'};
+        for (var i = 0; i < filtered.length; i++) {
+            var l = filtered[i];
             var icon = icons[l.type] || 'notes';
-            return '<div class="log-entry ' + l.type + '">' +
+            var msg = l.message.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+            var time = l.time.toLocaleTimeString('en-US',{hour12:false});
+            html += '<div class="log-entry ' + l.type + '">' +
                 '<span class="log-icon material-symbols-outlined">' + icon + '</span>' +
-                '<span class="log-content">' + escapeHtml(l.message) + '</span>' +
-                '<span class="log-time">' + l.time.toLocaleTimeString('en-US',{hour12:false}) + '</span>' +
+                '<span class="log-content">' + msg + '</span>' +
+                '<span class="log-time">' + time + '</span>' +
                 '<span class="log-type">' + l.type + '</span>' +
-            '</div>';
-        }).join('');
+                '</div>';
+        }
+        body.innerHTML = html;
+        if (empty) {
+            empty.style.display = filtered.length === 0 ? 'flex' : 'none';
+        }
+        setTimeout(function() { body.scrollTop = body.scrollHeight; }, 0);
     }
 
     function filterConsoleLogs(filter) {
@@ -2509,10 +2634,8 @@ function toggleDevPanel() {
 function applyDevOptions() {
     var newTabOn  = document.getElementById('devOpenNewTab').checked;
     var consolOn  = document.getElementById('devShowConsole').checked;
-    // Persist
     localStorage.setItem('untdoc_dev_newtab',  newTabOn);
     localStorage.setItem('untdoc_dev_console', consolOn);
-    // Show/hide console button in game toolbar
     var consoleBtn = document.querySelector('#gameOverlayToolbar button[onclick="toggleConsole()"]');
     if (consoleBtn) consoleBtn.style.display = consolOn ? '' : 'none';
 }
@@ -2520,8 +2643,8 @@ function applyDevOptions() {
 // Load saved dev settings on startup
 (function loadDevSettings() {
     function applySettings() {
-        var newTabOn = true;
-        var consolOn = localStorage.getItem('untdoc_dev_console') === 'true';
+        var newTabOn = localStorage.getItem('untdoc_dev_newtab') === 'true';
+        var consolOn = localStorage.getItem('untdoc_dev_console') !== 'false';
         var elNewTab = document.getElementById('devOpenNewTab');
         var elConsol = document.getElementById('devShowConsole');
         if (elNewTab) elNewTab.checked = newTabOn;
@@ -2624,11 +2747,11 @@ async function launchGame(fileName, baseUrl, isPNG, gameName) {
    <div id="gameOverlayToolbar">
       <span class="game-title" id="gameTitle">Loading...</span>
       <div style="display:flex;gap:0.5rem">
-         <button onclick="toggleConsole()"><span class="material-symbols-outlined" style="font-size:14px">terminal</span> Console</button>
+         <button onclick="toggleConsole()"><span class="material-symbols-outlined" style="font-size:14px">terminal</span> Console <span id="consoleBadge" style="display:none;background:var(--accent);color:#000;font-size:0.55rem;padding:0.1rem 0.35rem;border-radius:999px;font-weight:700;min-width:16px;text-align:center;">0</span></button>
          <button onclick="closeGame()"><span class="material-symbols-outlined" style="font-size:14px">close</span> Exit</button>
       </div>
    </div>
-   <iframe id="gameFrame" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+    <iframe id="gameFrame" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"></iframe>
 </div>
 
 <!-- ─── Dev Options Panel ─── -->
@@ -2644,7 +2767,7 @@ async function launchGame(fileName, baseUrl, isPNG, gameName) {
             Open in New Tab
          </span>
          <label class="dev-switch">
-            <input type="checkbox" id="devOpenNewTab" checked onchange="applyDevOptions()">
+            <input type="checkbox" id="devOpenNewTab" onchange="applyDevOptions()">
             <span class="dev-slider"></span>
          </label>
       </div>
@@ -2663,31 +2786,6 @@ async function launchGame(fileName, baseUrl, isPNG, gameName) {
       <span class="dev-dot"></span>
       Dev
    </button>
-</div>
-
-<div id="consoleOverlay" onclick="toggleConsole()"></div>
-<div id="consolePanel">
-   <div class="console-header">
-      <div class="console-title">
-         <span class="material-symbols-outlined" style="font-size:16px">terminal</span>
-         Console
-      </div>
-      <span class="console-hint">~ to close</span>
-   </div>
-   <div class="console-tabs">
-      <button class="console-tab active" data-filter="all" onclick="filterConsoleLogs('all')">All</button>
-      <button class="console-tab" data-filter="error" onclick="filterConsoleLogs('error')">Errors</button>
-      <button class="console-tab" data-filter="warn" onclick="filterConsoleLogs('warn')">Warnings</button>
-      <button class="console-tab" data-filter="info" onclick="filterConsoleLogs('info')">Info</button>
-      <button class="console-tab" data-filter="network" onclick="filterConsoleLogs('network')">Network</button>
-   </div>
-   <div class="console-body" id="consoleBody">
-      <div class="console-empty" id="consoleEmpty">Logs appear here. Press ~ to toggle.</div>
-   </div>
-   <div class="console-footer">
-      <input type="text" id="consoleInput" placeholder="Command..." onkeydown="handleConsoleInput(event)">
-      <button class="console-clear-btn" onclick="clearConsoleLogs()">Clear</button>
-   </div>
 </div>
 
 </body>
