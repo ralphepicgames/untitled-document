@@ -1481,9 +1481,9 @@
 </header>
 
 <nav>
-   <button class="nav-btn active" onclick="showTab('games')"><span class="material-symbols-outlined">sports_esports</span>GAMES</button>
-   <button class="nav-btn" onclick="showTab('pinned')"><span class="material-symbols-outlined">push_pin</span>PINNED</button>
-   <button class="nav-btn" onclick="showTab('compiler')"><span class="material-symbols-outlined">code</span>HTML COMPILER</button>
+   <button class="nav-btn active" onclick="showTab('games',this)"><span class="material-symbols-outlined">sports_esports</span>GAMES</button>
+   <button class="nav-btn" onclick="showTab('pinned',this)"><span class="material-symbols-outlined">push_pin</span>PINNED</button>
+   <button class="nav-btn" onclick="showTab('compiler',this)"><span class="material-symbols-outlined">code</span>HTML COMPILER</button>
    <button class="random-game-btn" id="randomGameBtn" onclick="launchRandomGame()"><span class="material-symbols-outlined random-dice-icon">casino</span>RANDOM</button>
 </nav>
 
@@ -1700,19 +1700,22 @@ let cachedAccentColor = '#ff2b9e';
        }
    }
 
-   {
-       const rawEmulatorGames = [
-           { name: "Ruffle (Flash Emulator)", file: "ruffle/index.html", baseUrl: "https://raw.githubusercontent.com/RalphEG/gfiles/master/emulators/" }
-       ];
-       for(let i=0; i<rawEmulatorGames.length; i++) {
-           allGames.push({
-               name: rawEmulatorGames[i].name,
-               file: rawEmulatorGames[i].file,
-               baseUrl: rawEmulatorGames[i].baseUrl,
-               isPNG: false
-           });
-       }
-   }
+    {
+        const rawEmulatorGames = [
+            { name: "Ruffle (Flash Emulator)", file: "ruffle/index.html", baseUrl: "https://raw.githubusercontent.com/RalphEG/gfiles/master/emulators/" },
+            { name: "Ruffle CDN (Official)", file: "https://ruffle.rs/demo/", baseUrl: "", external: true, skipFetch: true }
+        ];
+        for(let i=0; i<rawEmulatorGames.length; i++) {
+            allGames.push({
+                name: rawEmulatorGames[i].name,
+                file: rawEmulatorGames[i].file,
+                baseUrl: rawEmulatorGames[i].baseUrl,
+                isPNG: false,
+                external: rawEmulatorGames[i].external || false,
+                skipFetch: rawEmulatorGames[i].skipFetch || false
+            });
+        }
+    }
 
    {
        const rawOnefileGames = [
@@ -1881,9 +1884,9 @@ let cachedAccentColor = '#ff2b9e';
    let pinnedSet = new Set();
    try { pinnedSet = new Set(JSON.parse(localStorage.getItem(PINNED_GAMES_STORAGE_KEY) || '[]')); } catch(e) {}
 
-   function savePinnedGames() {
-       localStorage.setItem(PINNED_GAMES_STORAGE_KEY, JSON.stringify([...pinnedSet]));
-   }
+    function savePinnedGames() {
+        try { localStorage.setItem(PINNED_GAMES_STORAGE_KEY, JSON.stringify([...pinnedSet])); } catch(e) {}
+    }
 
    function togglePin(gameName) {
        if (pinnedSet.has(gameName)) pinnedSet.delete(gameName);
@@ -1909,7 +1912,7 @@ let cachedAccentColor = '#ff2b9e';
        container.appendChild(pinBtn);
        card.appendChild(container);
        pinBtn.onclick = (e) => { e.stopPropagation(); togglePin(game.name); };
-       card.onclick = () => launchGame(game.file, game.baseUrl, game.isPNG, game.name);
+        card.onclick = () => launchGame(game.file, game.baseUrl, game.isPNG, game.name, game.skipFetch, game.external);
        return card;
    }
 
@@ -2042,16 +2045,16 @@ let cachedAccentColor = '#ff2b9e';
         document.getElementById('editor').value = '';
    }
    
-   function showTab(tabId) {
-       const newTab = document.getElementById(tabId);
-       const navBtns = document.querySelectorAll('.nav-btn');
-       const clickedBtn = event.currentTarget;
+    function showTab(tabId, el) {
+        const newTab = document.getElementById(tabId);
+        const navBtns = document.querySelectorAll('.nav-btn');
+        const clickedBtn = el || (typeof event !== 'undefined' ? event.currentTarget : navBtns[0]);
 
-       document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
-       navBtns.forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+        navBtns.forEach(btn => btn.classList.remove('active'));
 
-       newTab.classList.add('active');
-       clickedBtn.classList.add('active');
+        newTab.classList.add('active');
+        clickedBtn.classList.add('active');
 
        if (tabId === 'compiler') {
            document.getElementById('easterEggOverlay').classList.add('show');
@@ -2061,8 +2064,72 @@ let cachedAccentColor = '#ff2b9e';
    const SERAPH_ROOT = 'https://cdn.jsdelivr.net/gh/a456pur/seraph@ae2fcc6d6a9cd051654fcc0519080db1f79cf2a7/';
 
    
-const CORS_PROXY = 'https://untdocunblock.untdocapis.workers.dev/?url=';
-function proxiedFetch(url) { return fetch(CORS_PROXY + encodeURIComponent(url)); }
+// CORS proxy chain for administrated devices - tries multiple proxies
+const CORS_PROXIES = [
+    { url: 'https://untdocunblock.untdocapis.workers.dev/?url=' },
+    { url: 'https://api.allorigins.win/raw?url=' },
+    { url: 'https://corsproxy.io/?url=' },
+    { url: 'https://api.codetabs.com/v1/proxy?quest=', param: 'quest' },
+];
+let corsProxyIndex = 0;
+
+function getActiveProxy() {
+    try { return localStorage.getItem('untdoc_active_proxy') || CORS_PROXIES[0].url; } catch(e) { return CORS_PROXIES[0].url; }
+}
+
+function setActiveProxy(url) {
+    try { localStorage.setItem('untdoc_active_proxy', url); } catch(e) {}
+    corsProxyIndex = -1;
+    for (var p = 0; p < CORS_PROXIES.length; p++) {
+        if (CORS_PROXIES[p].url === url) { corsProxyIndex = p; break; }
+    }
+    if (corsProxyIndex === -1) corsProxyIndex = 0;
+}
+
+var _abortSignalTimeout = AbortSignal.timeout || function(ms) {
+    var ctrl = new AbortController();
+    setTimeout(function() { ctrl.abort(); }, ms);
+    return ctrl.signal;
+};
+
+function buildProxyUrl(proxyObj, targetUrl) {
+    var encoded = encodeURIComponent(targetUrl);
+    if (proxyObj.param === 'quest') return proxyObj.url + encoded;
+    return proxyObj.url + encoded;
+}
+
+async function proxiedFetch(url, retries) {
+    retries = retries !== undefined ? retries : CORS_PROXIES.length - 1;
+    var activeProxyUrl = getActiveProxy();
+    var startIdx = 0;
+    for (var p = 0; p < CORS_PROXIES.length; p++) {
+        if (CORS_PROXIES[p].url === activeProxyUrl || CORS_PROXIES[p].url.indexOf(activeProxyUrl) !== -1) {
+            startIdx = p;
+            break;
+        }
+    }
+    
+    // Try direct fetch first (no proxy) - works if CORS allows
+    try {
+        var directResp = await fetch(url, { signal: _abortSignalTimeout(5000) });
+        if (directResp.ok) return directResp;
+    } catch(e) {}
+    
+    // Try each proxy in rotation, starting from the last working one
+    for (var i = 0; i < CORS_PROXIES.length; i++) {
+        var idx = (startIdx + i) % CORS_PROXIES.length;
+        var proxyObj = CORS_PROXIES[idx];
+        var proxyFullUrl = buildProxyUrl(proxyObj, url);
+        try {
+            var resp = await fetch(proxyFullUrl, { signal: _abortSignalTimeout(8000) });
+            if (resp.ok) {
+                if (proxyObj.url !== getActiveProxy()) setActiveProxy(proxyObj.url);
+                return resp;
+            }
+        } catch(e) {}
+    }
+    throw new Error('All proxies failed for ' + url);
+}
 
 function openGame(name) {
     document.getElementById('gameTitle').textContent = name;
@@ -2072,11 +2139,19 @@ function closeGame() {
     document.getElementById('gameOverlay').classList.remove('active');
     const frame = document.getElementById('gameFrame');
     iframeConsoleHook = null;
+    // Revoke any blob URL to free memory
+    if (frame.dataset.blobUrl) {
+        try { URL.revokeObjectURL(frame.dataset.blobUrl); } catch(e) {}
+        delete frame.dataset.blobUrl;
+    }
     frame.src = 'about:blank';
+    frame.contentDocument?.open();
+    frame.contentDocument?.write('<!DOCTYPE html><html><head></head><body style="background:#000"></body></html>');
+    frame.contentDocument?.close();
     if (consoleOpen) toggleConsole();
 }
 
-async function _launchGameOverlay(fileName, baseUrl, isPNG, gameName) {
+async function _launchGameOverlay(fileName, baseUrl, isPNG, gameName, skipFetch) {
     consoleLogs.length = 0;
     iframeConsoleHook = null;
     renderLogs();
@@ -2084,6 +2159,15 @@ async function _launchGameOverlay(fileName, baseUrl, isPNG, gameName) {
     const frame = document.getElementById('gameFrame');
     openGame(gameName || fileName);
     if (!consoleOpen) toggleConsole();
+
+    // External URLs: embed directly
+    if (skipFetch || fileName.startsWith('http://') || fileName.startsWith('https://')) {
+        if (skipFetch || baseUrl === '') {
+            frame.src = fileName;
+            document.getElementById('loader').classList.remove('active');
+            return;
+        }
+    }
 
     if (isPNG) {
         const fullUrl = baseUrl + fileName;
@@ -2139,7 +2223,7 @@ async function _launchGameOverlay(fileName, baseUrl, isPNG, gameName) {
             'window.onerror=function(m,u,l,c,e){lg("Error: "+m+" ("+u+":"+l+":"+c+")","error");if(_origOnError)return _origOnError.apply(this,arguments);return false};' +
             'var _origOnUnhandled=window.onunhandledrejection;' +
             'window.onunhandledrejection=function(e){lg("Unhandled Rejection: "+(e.reason&&e.reason.message||e.reason||String(e)),"error");if(_origOnUnhandled)return _origOnUnhandled.apply(this,arguments)};' +
-            'setInterval(_wrap,500);' +
+            'if(!window.__untdocConsoleHooked){window.__untdocConsoleHooked=true;setInterval(_wrap,500);}' +
             '})();' +
             '<\/script>';
 
@@ -2154,6 +2238,10 @@ async function _launchGameOverlay(fileName, baseUrl, isPNG, gameName) {
             'if(url.startsWith("/"))return _r+url.slice(1);' +
             'try{return new URL(url,_b).href}catch(e){return url}' +
             '}' +
+            '// Make URL resolver globally accessible for other injected scripts' +
+            'window.__untdocResolveUrl=_u;' +
+            'window.__untdocBaseHref=_b;' +
+            'window.__untdocRootHref=_r;' +
             'var _f=window.fetch;window.fetch=function(i,init){' +
             'if(typeof i==="string")i=_u(i);' +
             'else if(i instanceof Request){var r=_u(i.url);if(r!==i.url)i=new Request(r,i)}' +
@@ -2181,33 +2269,83 @@ async function _launchGameOverlay(fileName, baseUrl, isPNG, gameName) {
                 }
             }
 
-            if (baseUrl === seraphBaseUrl && /<\/body>/i.test(html)) {
+            // Ruffle Flash fix: detect SWF files and load them via Ruffle
+            if (/\.swf|ruffle|flash/i.test(html) || baseUrl === seraphBaseUrl) {
+                const ruffleBase = JSON.stringify(baseHref);
                 const ruffleFixScript = '<script>(async function(){' +
-                    'if(!window.RufflePlayer)return;' +
-                    'var swfUrl=null;' +
-                    'var el=document.querySelector("embed[src*=\'.swf\'],object[data*=\'.swf\']");' +
-                    'if(el)swfUrl=el.getAttribute("src")||el.getAttribute("data");' +
-                    'if(!swfUrl){var scripts=document.querySelectorAll("script");for(var s of scripts){var m=s.textContent.match(/embedSWF\\s*\\(\\s*["\']([^"\']+\\.swf)/i);if(m){swfUrl=m[1];break;}var m2=s.textContent.match(/player\\.load\\s*\\(\\s*\\{[^}]*url\\s*:\\s*["\']([^"\']+)/i);if(m2){swfUrl=m2[1];break;}}}' +
+                    'var _b=' + ruffleBase + ';' +
+                    'function findSWF(){' +
+                    'var el=document.querySelector("embed[src*=\'.swf\'],object[data*=\'.swf\'],param[value*=\'.swf\']");' +
+                    'if(el){var src=el.getAttribute("src")||el.getAttribute("data")||el.getAttribute("value");if(src)return src;}' +
+                    'var imgs=document.querySelectorAll("img[src*=\'.swf\']");if(imgs.length)return imgs[0].getAttribute("src");' +
+                    'var scripts=document.querySelectorAll("script");' +
+                    'for(var s of scripts){' +
+                    'var t=s.textContent||"";' +
+                    'var m=t.match(/embedSWF\\s*\\(\\s*["\']([^"\']+\\.swf)/i);if(m)return m[1];' +
+                    'var m2=t.match(/player\\.load\\s*\\(\\s*\\{[^}]*url\\s*:\\s*["\']([^"\']+)/i);if(m2)return m2[1];' +
+                    'var m3=t.match(/["\']([^"\']+\\.swf)["\']/i);if(m3)return m3[1];' +
+                    '}' +
+                    'return null;' +
+                    '}' +
+                    'var swfUrl=findSWF();' +
                     'if(!swfUrl)return;' +
-                    'if(!swfUrl.startsWith("http"))swfUrl=new URL(swfUrl,_b).href;' +
+                    'if(!swfUrl.startsWith("http")){try{swfUrl=new URL(swfUrl,_b).href}catch(e){return}}' +
                     'try{' +
+                    'if(typeof RufflePlayer!=="undefined"&&RufflePlayer.newest){' +
                     'var resp=await fetch(swfUrl);' +
                     'var data=new Uint8Array(await resp.arrayBuffer());' +
-                    'var ruffle=window.RufflePlayer.newest();' +
+                    'var ruffle=RufflePlayer.newest();' +
                     'var player=ruffle.createPlayer();' +
-                    'player.style.cssText="position:fixed;inset:0;width:100%;height:100%;";' +
+                    'player.style.cssText="position:fixed;inset:0;width:100%;height:100%;border:none;";' +
                     'document.body.innerHTML="";' +
                     'document.body.style.margin="0";' +
+                    'document.body.style.background="#000";' +
+                    'document.body.style.overflow="hidden";' +
                     'document.body.appendChild(player);' +
-                    'player.load({data:data});' +
-                    '}catch(e){}' +
+                    'await player.load({data:data});' +
+                    '}}catch(e){console.warn("Ruffle auto-load failed:",e)}' +
                     '})();<\/script>';
                 html = html.replace(/<\/body>/i, ruffleFixScript + '</body>');
             }
 
-            frame.contentDocument.open();
-            frame.contentDocument.write(html);
-            frame.contentDocument.close();
+            // Unity WebGL fix: ensure UnityLoader/loader.js can resolve data/wasm files
+            if (/UnityLoader|\.unity3d|Build\/|\.wasm|\.data\.gz/i.test(html)) {
+                const unityFix = '<script>' +
+                    '(function(){' +
+                    'var _b=window.__untdocBaseHref||' + JSON.stringify(baseHref) + ';' +
+                    '// Unity sometimes uses location.href to resolve paths - override' +
+                    'var _origLocProp=Object.getOwnPropertyDescriptor?Object.getOwnPropertyDescriptor(HTMLDocument.prototype,"URL"):null;' +
+                    'try{' +
+                    'Object.defineProperty(document,"URL",{get:function(){return _b+document.location.hash},configurable:true});' +
+                    '}catch(e){}' +
+                    '// Fix Unity WebGL builds that check iframe embedding' +
+                    'try{' +
+                    'Object.defineProperty(document,"referrer",{get:function(){return _b},configurable:true});' +
+                    '}catch(e){}' +
+                    '// Ensure Unity can create audio context (blocked in some embed scenarios)' +
+                    'try{' +
+                    'var _origAC=window.AudioContext||window.webkitAudioContext;' +
+                    'if(_origAC){' +
+                    'window.AudioContext=function(){try{return new _origAC()}catch(e){return null}};' +
+                    'window.webkitAudioContext=window.AudioContext;' +
+                    '}' +
+                    '}catch(e){}' +
+                    '})();<\/script>';
+                html = html.replace(/<\/body>/i, unityFix + '</body>');
+            }
+
+            // Bypass mode: use blob URL instead of document.write (evades some security restrictions)
+            var bypassEl = document.getElementById('devBypassMode');
+            if (bypassEl && bypassEl.checked) {
+                var blob = new Blob([html], { type: 'text/html' });
+                var blobUrl = URL.createObjectURL(blob);
+                frame.dataset.blobUrl = blobUrl;
+                frame.src = blobUrl;
+            } else {
+                frame.contentDocument.open();
+                frame.contentDocument.write(html);
+                frame.contentDocument.close();
+            }
             setTimeout(hookIframeConsole, 100);
         } catch (e) {
             try {
@@ -2308,15 +2446,17 @@ async function _launchGameOverlay(fileName, baseUrl, isPNG, gameName) {
    const root = document.documentElement;
    const colorPicker = document.getElementById('accentColorPicker');
 
-   function loadAccentColor() {
-       const savedColor = localStorage.getItem(STORAGE_KEY);
-       if (savedColor) {
-           applyAccentColor(savedColor);
-           colorPicker.value = savedColor;
-       } else {
-           colorPicker.value = DEFAULT_ACCENT_COLOR;
-       }
-   }
+    function loadAccentColor() {
+        try {
+            const savedColor = localStorage.getItem(STORAGE_KEY);
+            if (savedColor) {
+                applyAccentColor(savedColor);
+                colorPicker.value = savedColor;
+                return;
+            }
+        } catch(e) {}
+        colorPicker.value = DEFAULT_ACCENT_COLOR;
+    }
 
    function hexToRgb(hex) {
        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -2349,9 +2489,9 @@ async function _launchGameOverlay(fileName, baseUrl, isPNG, gameName) {
        if (favicon) favicon.href = 'data:image/svg+xml,' + encodeURIComponent(faviconSvg);
    }
 
-   function saveAccentColor(color) {
-       localStorage.setItem(STORAGE_KEY, color);
-   }
+    function saveAccentColor(color) {
+        try { localStorage.setItem(STORAGE_KEY, color); } catch(e) {}
+    }
 
    function handleColorChange(event) {
        const newColor = event.target.value;
@@ -2367,10 +2507,11 @@ async function _launchGameOverlay(fileName, baseUrl, isPNG, gameName) {
    const animationsToggle = document.getElementById('animationsToggle');
    const animationsStorageKey = 'untdoc_animations_enabled';
 
-   function loadAnimationsSetting() {
-       const savedSetting = localStorage.getItem(animationsStorageKey);
-       if (savedSetting !== null) {
-           animationsToggle.checked = savedSetting === 'true';
+    function loadAnimationsSetting() {
+        var savedSetting = null;
+        try { savedSetting = localStorage.getItem(animationsStorageKey); } catch(e) {}
+        if (savedSetting !== null) {
+            animationsToggle.checked = savedSetting === 'true';
            if (!animationsToggle.checked) {
                disableAllAnimations();
            }
@@ -2383,7 +2524,7 @@ async function _launchGameOverlay(fileName, baseUrl, isPNG, gameName) {
        } else {
            disableAllAnimations();
        }
-       localStorage.setItem(animationsStorageKey, animationsToggle.checked);
+        try { localStorage.setItem(animationsStorageKey, animationsToggle.checked); } catch(e) {}
    }
 
    function disableAllAnimations() {
@@ -2505,23 +2646,17 @@ async function _launchGameOverlay(fileName, baseUrl, isPNG, gameName) {
         } catch(e) {}
     }
 
-    // Re-hook when iframe content changes
-    var iframeObserver = setInterval(function() {
-        var frame = document.getElementById('gameFrame');
-        if (frame && frame.contentDocument && frame.contentDocument.readyState === 'complete') {
-            hookIframeConsole();
+    // Hook iframe console via MutationObserver (efficient, no polling)
+    var _consoleFrame = document.getElementById('gameFrame');
+    if (_consoleFrame) {
+        _consoleFrame.addEventListener('load', function() {
+            setTimeout(hookIframeConsole, 100);
+        });
+        // If document already loaded, try hooking
+        if (_consoleFrame.contentDocument && _consoleFrame.contentDocument.readyState === 'complete') {
+            setTimeout(hookIframeConsole, 100);
         }
-    }, 200);
-
-    // Also hook on iframe load event
-    document.addEventListener('DOMContentLoaded', function() {
-        var frame = document.getElementById('gameFrame');
-        if (frame) {
-            frame.addEventListener('load', function() {
-                setTimeout(hookIframeConsole, 50);
-            });
-        }
-    });
+    }
 
     function escapeHtml(text) {
         var d = document.createElement('div');
@@ -2635,21 +2770,37 @@ function toggleDevPanel() {
 function applyDevOptions() {
     var newTabOn  = document.getElementById('devOpenNewTab').checked;
     var consolOn  = document.getElementById('devShowConsole').checked;
-    localStorage.setItem('untdoc_dev_newtab',  newTabOn);
-    localStorage.setItem('untdoc_dev_console', consolOn);
+    var bypassEl = document.getElementById('devBypassMode');
+    var bypassOn  = bypassEl ? bypassEl.checked : false;
+    try {
+        localStorage.setItem('untdoc_dev_newtab',  newTabOn);
+        localStorage.setItem('untdoc_dev_console', consolOn);
+        localStorage.setItem('untdoc_dev_bypass',  bypassOn);
+    } catch(e) {}
     var consoleBtn = document.querySelector('#gameOverlayToolbar button[onclick="toggleConsole()"]');
     if (consoleBtn) consoleBtn.style.display = consolOn ? '' : 'none';
+    if (bypassOn) {
+        // Bypass: try direct fetch first before any proxy
+        corsProxyIndex = 0;
+    }
 }
 
 // Load saved dev settings on startup
 (function loadDevSettings() {
     function applySettings() {
-        var newTabOn = localStorage.getItem('untdoc_dev_newtab') === 'true';
-        var consolOn = localStorage.getItem('untdoc_dev_console') !== 'false';
+        try {
+            var newTabOn = localStorage.getItem('untdoc_dev_newtab') === 'true';
+            var consolOn = localStorage.getItem('untdoc_dev_console') !== 'false';
+            var bypassOn = localStorage.getItem('untdoc_dev_bypass') === 'true';
+        } catch(e) {
+            var newTabOn = false, consolOn = true, bypassOn = false;
+        }
         var elNewTab = document.getElementById('devOpenNewTab');
         var elConsol = document.getElementById('devShowConsole');
+        var elBypass = document.getElementById('devBypassMode');
         if (elNewTab) elNewTab.checked = newTabOn;
         if (elConsol) elConsol.checked = consolOn;
+        if (elBypass) elBypass.checked = bypassOn;
         var consoleBtn = document.querySelector('#gameOverlayToolbar button[onclick="toggleConsole()"]');
         if (consoleBtn) consoleBtn.style.display = consolOn ? '' : 'none';
     }
@@ -2661,7 +2812,15 @@ function applyDevOptions() {
 })();
 
 // Patch launchGame to respect dev options
-async function launchGame(fileName, baseUrl, isPNG, gameName) {
+async function launchGame(fileName, baseUrl, isPNG, gameName, skipFetch, external) {
+    // External URLs: open directly in new tab
+    if (external || fileName.startsWith('http://') || fileName.startsWith('https://')) {
+        if (baseUrl === '' || skipFetch) {
+            var win = window.open(fileName, '_blank');
+            return;
+        }
+    }
+
     var newTabOn = document.getElementById('devOpenNewTab').checked;
     if (newTabOn) {
         // UNTDOC 6 mechanism: open new tab, fetch directly (no proxy), write HTML in
@@ -2705,28 +2864,66 @@ async function launchGame(fileName, baseUrl, isPNG, gameName) {
                     else html = patchScript + html;
                 }
 
-                if (baseUrl === seraphBaseUrl && /<\/body>/i.test(html)) {
+                // Ruffle Flash fix (new tab mode)
+                if (/\.swf|ruffle|flash/i.test(html) || baseUrl === seraphBaseUrl) {
+                    var _ruffleBase = JSON.stringify(baseHref);
                     var ruffleFixScript = '<script>(async function(){' +
-                        'if(!window.RufflePlayer)return;' +
-                        'var swfUrl=null;' +
-                        'var el=document.querySelector("embed[src*=\'.swf\'],object[data*=\'.swf\']");' +
-                        'if(el)swfUrl=el.getAttribute("src")||el.getAttribute("data");' +
-                        'if(!swfUrl){var scripts=document.querySelectorAll("script");for(var s of scripts){var m=s.textContent.match(/embedSWF\\s*\\(\\s*["\']([^"\']+\\.swf)/i);if(m){swfUrl=m[1];break;}var m2=s.textContent.match(/player\\.load\\s*\\(\\s*\\{[^}]*url\\s*:\\s*["\']([^"\']+)/i);if(m2){swfUrl=m2[1];break;}}}' +
+                        'var _b=' + _ruffleBase + ';' +
+                        'function findSWF(){' +
+                        'var el=document.querySelector("embed[src*=\'.swf\'],object[data*=\'.swf\'],param[value*=\'.swf\']");' +
+                        'if(el){var src=el.getAttribute("src")||el.getAttribute("data")||el.getAttribute("value");if(src)return src;}' +
+                        'var imgs=document.querySelectorAll("img[src*=\'.swf\']");if(imgs.length)return imgs[0].getAttribute("src");' +
+                        'var scripts=document.querySelectorAll("script");' +
+                        'for(var s of scripts){' +
+                        'var t=s.textContent||"";' +
+                        'var m=t.match(/embedSWF\\s*\\(\\s*["\']([^"\']+\\.swf)/i);if(m)return m[1];' +
+                        'var m2=t.match(/player\\.load\\s*\\(\\s*\\{[^}]*url\\s*:\\s*["\']([^"\']+)/i);if(m2)return m2[1];' +
+                        'var m3=t.match(/["\']([^"\']+\\.swf)["\']/i);if(m3)return m3[1];' +
+                        '}' +
+                        'return null;' +
+                        '}' +
+                        'var swfUrl=findSWF();' +
                         'if(!swfUrl)return;' +
-                        'if(!swfUrl.startsWith("http"))swfUrl=new URL(swfUrl,_base).href;' +
+                        'if(!swfUrl.startsWith("http")){try{swfUrl=new URL(swfUrl,_b).href}catch(e){return}}' +
                         'try{' +
+                        'if(typeof RufflePlayer!=="undefined"&&RufflePlayer.newest){' +
                         'var resp=await fetch(swfUrl);' +
                         'var data=new Uint8Array(await resp.arrayBuffer());' +
-                        'var ruffle=window.RufflePlayer.newest();' +
+                        'var ruffle=RufflePlayer.newest();' +
                         'var player=ruffle.createPlayer();' +
-                        'player.style.cssText="position:fixed;inset:0;width:100%;height:100%;";' +
+                        'player.style.cssText="position:fixed;inset:0;width:100%;height:100%;border:none;";' +
                         'document.body.innerHTML="";' +
                         'document.body.style.margin="0";' +
+                        'document.body.style.background="#000";' +
+                        'document.body.style.overflow="hidden";' +
                         'document.body.appendChild(player);' +
-                        'player.load({data:data});' +
-                        '}catch(e){}' +
+                        'await player.load({data:data});' +
+                        '}}catch(e){console.warn("Ruffle auto-load failed:",e)}' +
                         '})();<\/script>';
                     html = html.replace(/<\/body>/i, ruffleFixScript + '</body>');
+                }
+
+                // Unity WebGL fix (new tab mode)
+                if (/UnityLoader|\.unity3d|Build\/|\.wasm|\.data\.gz/i.test(html)) {
+                    var _unityBase = JSON.stringify(baseHref);
+                    var unityFix = '<script>' +
+                        '(function(){' +
+                        'var _b=' + _unityBase + ';' +
+                        'try{' +
+                        'Object.defineProperty(document,"URL",{get:function(){return _b+document.location.hash},configurable:true});' +
+                        '}catch(e){}' +
+                        'try{' +
+                        'Object.defineProperty(document,"referrer",{get:function(){return _b},configurable:true});' +
+                        '}catch(e){}' +
+                        'try{' +
+                        'var _origAC=window.AudioContext||window.webkitAudioContext;' +
+                        'if(_origAC){' +
+                        'window.AudioContext=function(){try{return new _origAC()}catch(e){return null}};' +
+                        'window.webkitAudioContext=window.AudioContext;' +
+                        '}' +
+                        '}catch(e){}' +
+                        '})();<\/script>';
+                    html = html.replace(/<\/body>/i, unityFix + '</body>');
                 }
 
                 win.document.open();
@@ -2740,7 +2937,7 @@ async function launchGame(fileName, baseUrl, isPNG, gameName) {
         }
         return;
     }
-    return _launchGameOverlay(fileName, baseUrl, isPNG, gameName);
+    return _launchGameOverlay(fileName, baseUrl, isPNG, gameName, skipFetch);
 }
 </script>
 
@@ -2752,7 +2949,7 @@ async function launchGame(fileName, baseUrl, isPNG, gameName) {
          <button onclick="closeGame()"><span class="material-symbols-outlined" style="font-size:14px">close</span> Exit</button>
       </div>
    </div>
-    <iframe id="gameFrame" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"></iframe>
+    <iframe id="gameFrame" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads allow-orientation-lock allow-pointer-lock allow-presentation allow-top-navigation-by-user-activation"></iframe>
 </div>
 
 <!-- ─── Dev Options Panel ─── -->
@@ -2779,6 +2976,16 @@ async function launchGame(fileName, baseUrl, isPNG, gameName) {
          </span>
          <label class="dev-switch">
             <input type="checkbox" id="devShowConsole" onchange="applyDevOptions()">
+            <span class="dev-slider"></span>
+         </label>
+      </div>
+      <div class="dev-panel-row">
+         <span class="dev-row-label">
+            <span class="material-symbols-outlined">lock_open</span>
+            Bypass Mode
+         </span>
+         <label class="dev-switch">
+            <input type="checkbox" id="devBypassMode" onchange="applyDevOptions()">
             <span class="dev-slider"></span>
          </label>
       </div>
