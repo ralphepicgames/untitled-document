@@ -18662,14 +18662,15 @@ registerProcessor('bitcrusher-processor', BitcrusherProcessor);`;
         audioAnalyzer.smoothingTimeConstant = 0.8;
         const finalGain = audioCtx.createGain();
         finalGain.gain.value = 1.0;
-        // Volume Boost node (VLC-style, 0x–2x gain, default 1.0 = 100%)
+        // Volume Boost node — placed BEFORE the limiter so boost is actually audible
         window.boostGainNode = audioCtx.createGain();
-        const _savedVol = parseFloat(localStorage.getItem('goot_volume') || '1'); window.boostGainNode.gain.value = _savedVol > 1 ? Math.min(2, _savedVol) : 1;
-        prevNode.connect(limiterNode);
+        const _savedVol = parseFloat(localStorage.getItem('goot_volume') || '1');
+        window.boostGainNode.gain.value = _savedVol > 1 ? Math.min(2, _savedVol) : 1;
+        prevNode.connect(window.boostGainNode);
+        window.boostGainNode.connect(limiterNode);
         limiterNode.connect(finalGain);
-        finalGain.connect(window.boostGainNode);
-        window.boostGainNode.connect(audioCtx.destination);
-        window.boostGainNode.connect(audioAnalyzer); // Analyzer gets copy of final audio
+        finalGain.connect(audioCtx.destination);
+        finalGain.connect(audioAnalyzer); // Analyzer gets copy of final audio
         frequencyData = new Uint8Array(audioAnalyzer.frequencyBinCount);
         setTimeout(() => applyCurrentEffects(), 100);
         return audioCtx;
@@ -34218,6 +34219,11 @@ function setVolume(val) {
     player.volume = playerVol;
     player2.volume = playerVol;
     if (window.boostGainNode) window.boostGainNode.gain.value = boostGain;
+    // Relax limiter threshold when boosting so it doesn't cancel the gain
+    if (typeof limiterNode !== 'undefined' && limiterNode) {
+        const thresh = val > 1 ? Math.max(-24, -3 - (val - 1) * 21) : -3;
+        limiterNode.threshold.setValueAtTime(thresh, (audioCtx || audioContext)?.currentTime || 0);
+    }
     if (player.muted && val > 0) player.muted = false;
     if (player2.muted && val > 0) player2.muted = false;
     const _ytVid = document.getElementById('ytVideo');
