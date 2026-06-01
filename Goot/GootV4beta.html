@@ -45164,6 +45164,21 @@ async function navigateToRealAlbumFolder(albumName, artistName, trackId) {
         _graphDisconnected = true;
     }
 
+    function _restampPitch() {
+        // Re-apply playback rate on both players after ctx resume/reconnect.
+        // iOS can drift the effective rate when AudioContext suspends/resumes.
+        var rate = (typeof effectsState !== 'undefined' && effectsState && effectsState.speed)
+            ? effectsState.speed / 100 : 1;
+        [typeof player !== 'undefined' ? player : null,
+         typeof player2 !== 'undefined' ? player2 : null].forEach(function(el) {
+            if (!el) return;
+            el.preservesPitch = false;
+            el.mozPreservesPitch = false;
+            el.webkitPreservesPitch = false;
+            el.playbackRate = rate;
+        });
+    }
+
     function _reconnectGraph() {
         if (!_graphDisconnected) return;
         try {
@@ -45175,6 +45190,7 @@ async function navigateToRealAlbumFolder(albumName, artistName, trackId) {
         } catch(e) {}
         _graphDisconnected = false;
         if (typeof applyCurrentEffects === 'function') { try { applyCurrentEffects(); } catch(e) {} }
+        _restampPitch();
     }
 
     function _tryResume() {
@@ -45182,9 +45198,13 @@ async function navigateToRealAlbumFolder(albumName, artistName, trackId) {
         if (!ctx) return;
         _hookCtxStateChange(ctx);
         if (ctx.state === 'suspended') {
-            ctx.resume().then(function() { if (_graphDisconnected) _reconnectGraph(); }).catch(function(){});
-        } else if (_graphDisconnected) {
-            _reconnectGraph();
+            ctx.resume().then(function() {
+                if (_graphDisconnected) _reconnectGraph();
+                _restampPitch();
+            }).catch(function(){});
+        } else {
+            if (_graphDisconnected) _reconnectGraph();
+            _restampPitch();
         }
     }
 
@@ -45195,7 +45215,7 @@ async function navigateToRealAlbumFolder(albumName, artistName, trackId) {
                 var ctx = _getCtx();
                 if (!ctx) return;
                 _hookCtxStateChange(ctx);
-                ctx.resume().catch(function() { _disconnectGraph(); });
+                ctx.resume().then(function() { _restampPitch(); }).catch(function() { _disconnectGraph(); });
                 setTimeout(function() {
                     var c = _getCtx();
                     if (c && c.state === 'suspended') _disconnectGraph();
@@ -45218,7 +45238,7 @@ async function navigateToRealAlbumFolder(albumName, artistName, trackId) {
         var ctx = _getCtx();
         if (!ctx) return;
         if (document.hidden && ctx.state === 'suspended') {
-            ctx.resume().then(function() { if (_graphDisconnected) _reconnectGraph(); }).catch(function() { _disconnectGraph(); });
+            ctx.resume().then(function() { if (_graphDisconnected) _reconnectGraph(); _restampPitch(); }).catch(function() { _disconnectGraph(); });
         } else if (document.hidden && _graphDisconnected && ctx.state === 'running') {
             _reconnectGraph();
         }
