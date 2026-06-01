@@ -11513,7 +11513,7 @@
 			.app-shell{ flex-direction: column; overflow-x: hidden; }
 			.nav-rail{ display: none !important; }
 			.main-container {
-				padding-bottom: calc(160px + env(safe-area-inset-bottom)) !important;
+				padding-bottom: calc(196px + env(safe-area-inset-bottom)) !important;
 				width: 100% !important;
 				max-width: 100% !important;
 				overflow-x: hidden !important;
@@ -11685,41 +11685,36 @@
 				-webkit-overflow-scrolling: touch;
 				padding: 8px 0 calc(20px + env(safe-area-inset-bottom));
 			}
-			/* ── Mini player: flexbox — track info left, controls right ── */
+			/* ── Mobile player bar ─────────────────────────────────────────────────
+			   Layout:  [art + track info]  |  [like ⏮ ▶ ⏭ dislike]
+			            [    full-width progress bar: 0:00 ══════ 0:00    ]
+			   ──────────────────────────────────────────────────────────────── */
 			.player-bar {
 				position: fixed !important;
 				bottom: calc(60px + env(safe-area-inset-bottom)) !important;
 				left: 0 !important;
 				right: 0 !important;
 				border-radius: 0 !important;
-				height: 64px !important;
+				height: 96px !important;
 				display: flex !important;
 				flex-direction: row !important;
-				align-items: center !important;
-				padding: 0 8px 0 10px !important;
+				align-items: flex-start !important;
+				padding: 0 0 0 10px !important;
 				gap: 0 !important;
 				z-index: 299 !important;
 				border: none !important;
-				border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
-				cursor: pointer;
+				border-top: 1px solid rgba(255,255,255,0.08) !important;
+				cursor: default !important;
 				background: color-mix(in srgb, var(--md-sys-color-surface-container-high) 97%, transparent) !important;
 				backdrop-filter: blur(20px) !important;
 				-webkit-backdrop-filter: blur(20px) !important;
 				box-shadow: none !important;
 				overflow: hidden !important;
 			}
-			/* Progress line at bottom */
-			.player-bar::after {
-				content: '';
-				position: absolute;
-				bottom: 0;
-				left: 0;
-				width: var(--mini-progress, 0%);
-				height: 2px;
-				background: var(--md-sys-color-primary);
-				transition: width 0.5s linear;
-			}
-			/* Track info — takes all remaining space, flex child */
+			/* No pseudo-element progress — using the real pb-classic-progress row */
+			.player-bar::before, .player-bar::after { display: none !important; }
+
+			/* ── Track info: left column, vertically centered in top 56px ── */
 			#playerBarTrackInfo {
 				flex: 1 !important;
 				min-width: 0 !important;
@@ -11731,90 +11726,160 @@
 				gap: 10px !important;
 				overflow: hidden !important;
 				pointer-events: auto !important;
-			}
-			/* Art — override hardcoded 74px inline style */
-			#npArt {
-				width: 46px !important;
-				height: 46px !important;
-				min-width: 46px !important;
-				max-width: 46px !important;
-				border-radius: 8px !important;
+				padding-right: 190px !important;
+				height: 64px !important;
 				flex-shrink: 0 !important;
+			}
+			/* Art */
+			#npArt {
+				width: 44px !important; height: 44px !important;
+				min-width: 44px !important; max-width: 44px !important;
+				border-radius: 6px !important; flex-shrink: 0 !important;
 				box-shadow: 0 2px 8px rgba(0,0,0,0.45) !important;
 				overflow: hidden !important;
 			}
-			/* Make sure the music note placeholder is centred inside the smaller art */
 			#npArt > div:first-child {
-				width: 100% !important;
-				height: 100% !important;
-				display: flex !important;
-				align-items: center !important;
-				justify-content: center !important;
+				width: 100% !important; height: 100% !important;
+				display: flex !important; align-items: center !important; justify-content: center !important;
 			}
-			#npArt > div:first-child i { font-size: 18px !important; }
-			/* Text block — must not shrink past its container */
+			#npArt > div:first-child i { font-size: 16px !important; }
+			/* Text */
 			#playerBarTrackInfo > div:last-child {
-				min-width: 0 !important;
-				overflow: hidden !important;
-				flex: 1 !important;
+				min-width: 0 !important; overflow: hidden !important; flex: 1 !important;
 			}
-			/* Hide album line in mini player */
-			#npAlbum{ display: none !important; }
-			/* Controls — fixed-width flex child on the right */
+			#npAlbum { display: none !important; }
+
+			/* ── Controls: absolutely centered in top 64px, column layout ── */
 			#playerBarControls {
-				position: static !important;
-				order: 2 !important;
-				flex-shrink: 0 !important;
-				width: 128px !important;
+				position: absolute !important;
+				left: 0 !important;
+				right: 0 !important;
+				top: 0 !important;
+				height: 96px !important;
+				width: 100% !important;
+				display: flex !important;
+				flex-direction: column !important;
+				align-items: center !important;
+				justify-content: flex-start !important;
+				gap: 0 !important;
+				padding: 0 !important;
+				z-index: 1 !important;
+				pointer-events: none !important;
+			}
+			/* Buttons row — centered, pointer-events restored */
+			.player-bar .pb-classic-btns {
 				display: flex !important;
 				flex-direction: row !important;
 				align-items: center !important;
 				justify-content: center !important;
-				gap: 2px !important;
-				padding: 0 !important;
+				gap: 0 !important;
+				height: 64px !important;
+				width: 100% !important;
+				pointer-events: auto !important;
 			}
-			/* Hide everything except skip-back, play, next */
-			#playerBarProgressBg,
-			#playerBarArtBg,
-			#curTime,
-			#durTime,
-			#playerBarShareBtn,
-			#volIcon,
-			#volSlider,
-			.player-bar-volume-btn,
-			#playerBarExtendedBtn,
-			.player-bar-utility-btn,
-			#btnShuffle,
-			#btnRepeat,
-			.player-bar-icon-btn,
-			.pb-rate-wrap,
-			.pb-classic-progress,
-			.pb-right-actions { display: none !important; }
-			/* Skip-back button — show it so user has prev/play/next */
-			#btnSkipBack {
+			/* Progress row — full width below buttons */
+			.player-bar .pb-classic-progress {
+				display: flex !important;
+				flex-direction: row !important;
+				align-items: center !important;
+				width: 100% !important;
+				height: 32px !important;
+				padding: 0 12px !important;
+				gap: 8px !important;
+				box-sizing: border-box !important;
+				pointer-events: auto !important;
+			}
+			.pb-layout-classic .player-bar .pb-classic-progress {
 				display: flex !important;
 			}
-			/* Play button */
-			.player-bar-play-btn {
-				width: 44px !important;
-				height: 44px !important;
-				font-size: 19px !important;
-				background: transparent !important;
-				box-shadow: none !important;
-				border: none !important;
+			/* Time labels */
+			.player-bar .pb-classic-progress #curTime,
+			.player-bar .pb-classic-progress #durTime {
+				display: block !important;
+				font-size: 11px !important;
 				color: var(--md-sys-color-on-surface) !important;
+				opacity: 0.6 !important;
+				white-space: nowrap !important;
 				flex-shrink: 0 !important;
+				min-width: 28px !important;
 			}
-			/* Prev / Next buttons */
-			.player-bar-control-btn {
-				width: 36px !important;
-				height: 36px !important;
-				font-size: 17px !important;
-				background: transparent !important;
-				box-shadow: none !important;
+			/* Progress track */
+			#classicPlayerBarProgressBg {
+				flex: 1 !important;
+				height: 4px !important;
+				min-height: 4px !important;
+				border-radius: 3px !important;
+				position: relative !important;
+				overflow: visible !important;
+				cursor: pointer !important;
+				transition: height 0.15s ease !important;
+			}
+			#classicPlayerBarProgressBg:hover,
+			#classicPlayerBarProgressBg.scrubbing {
+				height: 10px !important;
+				border-radius: 5px !important;
+			}
+			/* Fill */
+			#classicProgFill {
+				border-radius: 3px !important;
+			}
+			/* Scrub input — tall touch target */
+			#classicProgScrub {
+				position: absolute !important;
+				top: 50% !important;
+				transform: translateY(-50%) !important;
+				left: 0 !important;
+				width: 100% !important;
+				height: 32px !important;
+				opacity: 0 !important;
+				cursor: pointer !important;
+				z-index: 5 !important;
+				-webkit-appearance: none !important;
+				touch-action: none !important;
+			}
+
+			/* ── Hide desktop-only clutter ── */
+			.player-bar #playerBarProgressBg,
+			.player-bar #playerBarArtBg,
+			.player-bar #playerBarShareBtn,
+			.player-bar #volIcon,
+			.player-bar #volSlider,
+			.player-bar .player-bar-volume-btn,
+			.player-bar #playerBarExtendedBtn,
+			.player-bar .player-bar-utility-btn,
+			.player-bar #btnShuffle,
+			.player-bar #btnRepeat,
+			.player-bar .player-bar-icon-btn,
+			.player-bar .pb-right-actions { display: none !important; }
+			.player-bar .pb-rate-count { display: none !important; }
+			/* Show like / dislike / prev / skip */
+			.player-bar .pb-rate-wrap { display: flex !important; align-items: center !important; }
+			.player-bar #pbLikeBtn,
+			.player-bar #pbDislikeBtn,
+			.player-bar #btnSkipBack { display: flex !important; }
+
+			/* ── Button sizing ── */
+			.player-bar .pb-like-btn,
+			.player-bar .pb-dislike-btn {
+				width: 32px !important; height: 32px !important;
+				font-size: 13px !important;
+				background: transparent !important; box-shadow: none !important; border: none !important;
 				color: var(--md-sys-color-on-surface) !important;
-				flex-shrink: 0 !important;
+				opacity: 0.55 !important; flex-shrink: 0 !important;
+				display: flex !important; align-items: center !important; justify-content: center !important;
 			}
+			.player-bar .player-bar-play-btn {
+				width: 44px !important; height: 44px !important; font-size: 20px !important;
+				background: transparent !important; box-shadow: none !important; border: none !important;
+				color: var(--md-sys-color-on-surface) !important; flex-shrink: 0 !important;
+			}
+			.player-bar .player-bar-control-btn {
+				width: 36px !important; height: 36px !important; font-size: 17px !important;
+				background: transparent !important; box-shadow: none !important;
+				color: var(--md-sys-color-on-surface) !important; flex-shrink: 0 !important;
+			}
+			/* Remove mobileProgScrub — using classicProgScrub directly now */
+			#mobileProgScrub { display: none !important; }
 			/* ── Bottom nav bar ── */
 			.mobile-bottom-nav {
 				display: flex !important;
@@ -12526,6 +12591,114 @@
 			.selection-action-bar{ padding-bottom: env(safe-area-inset-bottom); }
 			/* ── Page content horizontal padding ── */
 			.eq-page-wrapper{ padding-left: 16px !important; padding-right: 16px !important; }
+
+			/* ── MOBILE PLAYER BAR: NUCLEAR OVERRIDE ──────────────────────────────────
+			   Two rows: [like ⏮ ▶ ⏭ dislike] centered | [0:00 ══progress══ 0:00]
+			   html body prefix = max specificity. Last in file = wins cascade.   */
+			@media (max-width: 768px) {
+				html body .player-bar {
+					display: flex !important; flex-direction: row !important;
+					align-items: flex-start !important;
+					height: 96px !important; min-height: 96px !important; max-height: 96px !important;
+					overflow: hidden !important;
+					padding: 0 0 0 10px !important; gap: 0 !important;
+				}
+				html body .player-bar::before,
+				html body .player-bar::after { display: none !important; }
+				html body .player-bar #playerBarTrackInfo {
+					display: flex !important; flex-direction: row !important;
+					align-items: center !important;
+					flex: 1 1 0 !important; min-width: 0 !important;
+					overflow: hidden !important; order: 1 !important;
+					position: static !important; gap: 10px !important;
+					height: 64px !important; flex-shrink: 0 !important;
+					padding-right: 190px !important;
+				}
+				html body .player-bar #playerBarTrackInfo > div:last-child {
+					flex: 1 1 0 !important; min-width: 0 !important;
+					overflow: hidden !important; display: block !important;
+				}
+				html body .player-bar #npArt {
+					width: 44px !important; height: 44px !important;
+					min-width: 44px !important; max-width: 44px !important;
+					border-radius: 6px !important; flex-shrink: 0 !important;
+				}
+				html body .player-bar #playerBarControls {
+					position: absolute !important;
+					left: 0 !important; right: 0 !important; top: 0 !important;
+					width: 100% !important; height: 96px !important;
+					display: flex !important; flex-direction: column !important;
+					align-items: center !important; justify-content: flex-start !important;
+					padding: 0 !important; gap: 0 !important;
+					pointer-events: none !important; transform: none !important;
+				}
+				html body .player-bar .pb-classic-btns {
+					display: flex !important; flex-direction: row !important;
+					align-items: center !important; justify-content: center !important;
+					height: 64px !important; width: 100% !important;
+					pointer-events: auto !important; gap: 0 !important;
+				}
+				html body .player-bar .pb-classic-progress {
+					display: flex !important; flex-direction: row !important;
+					align-items: center !important;
+					width: 100% !important; height: 32px !important;
+					padding: 0 12px !important; gap: 8px !important;
+					box-sizing: border-box !important; pointer-events: auto !important;
+				}
+				html body .player-bar .pb-classic-progress #curTime,
+				html body .player-bar .pb-classic-progress #durTime {
+					display: block !important;
+					font-size: 11px !important; opacity: 0.6 !important;
+					white-space: nowrap !important; flex-shrink: 0 !important;
+				}
+				html body .player-bar #classicPlayerBarProgressBg {
+					flex: 1 !important; height: 4px !important;
+					border-radius: 3px !important; position: relative !important;
+					overflow: visible !important; cursor: pointer !important;
+					display: block !important;
+				}
+				html body .player-bar #classicProgScrub {
+					position: absolute !important;
+					top: 50% !important; transform: translateY(-50%) !important;
+					left: 0 !important; width: 100% !important; height: 32px !important;
+					opacity: 0 !important; cursor: pointer !important;
+					z-index: 5 !important; -webkit-appearance: none !important;
+				}
+				/* Hide desktop clutter */
+				html body .player-bar .pb-right-actions,
+				html body .player-bar #playerBarProgressBg,
+				html body .player-bar #playerBarArtBg,
+				html body .player-bar #playerBarShareBtn,
+				html body .player-bar #playerBarExtendedBtn,
+				html body .player-bar #btnShuffle,
+				html body .player-bar #btnRepeat,
+				html body .player-bar .player-bar-utility-btn,
+				html body .player-bar .player-bar-volume-btn,
+				html body .player-bar #npAlbum,
+				html body .player-bar #mobileProgScrub { display: none !important; }
+				html body .player-bar .pb-rate-count { display: none !important; }
+				/* Show these */
+				html body .player-bar #btnSkipBack,
+				html body .player-bar #pbLikeBtn,
+				html body .player-bar #pbDislikeBtn { display: flex !important; }
+				html body .player-bar .pb-rate-wrap { display: flex !important; align-items: center !important; }
+				/* Button sizing */
+				html body .player-bar .player-bar-play-btn {
+					width: 44px !important; height: 44px !important; font-size: 20px !important; flex-shrink: 0 !important;
+				}
+				html body .player-bar .player-bar-control-btn {
+					width: 36px !important; height: 36px !important; font-size: 17px !important; flex-shrink: 0 !important;
+				}
+				html body .player-bar .pb-like-btn,
+				html body .player-bar .pb-dislike-btn {
+					width: 32px !important; height: 32px !important; font-size: 13px !important;
+					opacity: 0.55 !important; flex-shrink: 0 !important;
+					display: flex !important; align-items: center !important; justify-content: center !important;
+					background: transparent !important; border: none !important; box-shadow: none !important;
+				}
+			}
+			/* END NUCLEAR */
+			/* END NUCLEAR */
 			/* END MOBILE */
 	</style>
 	<base target="_blank">
@@ -14527,6 +14700,10 @@
 								</div>
 								<footer class="player-bar">
 									<canvas id="pbVizCanvas"></canvas>
+									<!-- Mobile progress scrubber — positioned fixed, invisible range input -->
+									<input type="range" id="mobileProgScrub" min="0" max="100" step="0.1" value="0"
+										oninput="event.stopPropagation(); scrub(this.value); document.documentElement.style.setProperty('--mini-progress', this.value + '%');"
+										onclick="event.stopPropagation()">
 									<div id="playerBarArtBg"></div>
 									<div id="playerBarProgressBg" class="pb-new-progress" style="position:absolute;top:0;left:0;right:0;height:3px;border-radius:14px 14px 0 0;overflow:visible;background:color-mix(in srgb, var(--md-sys-color-primary) 15%, rgba(255,255,255,0.08));z-index:10;cursor:pointer;transition:height 0.2s cubic-bezier(0.4,0,0.2,1);">
 										<div id="buffFill" style="position:absolute;height:100%;width:0%;background:color-mix(in srgb, var(--md-sys-color-primary) 25%, rgba(255,255,255,0.15));"></div>
@@ -30367,8 +30544,13 @@ function setPlayerBarLayout(layout) {
     applyPlayerBarLayout(layout);
 }
 function applyPlayerBarLayout(layout) {
-    document.documentElement.classList.add('pb-layout-classic');
-    document.documentElement.classList.remove('pb-layout-new');
+    if (layout === 'new') {
+        document.documentElement.classList.add('pb-layout-new');
+        document.documentElement.classList.remove('pb-layout-classic');
+    } else {
+        document.documentElement.classList.add('pb-layout-classic');
+        document.documentElement.classList.remove('pb-layout-new');
+    }
 }
 (function initPlayerBarLayout() {
     const saved = localStorage.getItem('goot_pb_layout') || 'classic';
@@ -34378,6 +34560,7 @@ player.ontimeupdate = () => {
     document.getElementById("fsProgScrub").value = p;
     document.getElementById("progScrub").value = p;
     (document.getElementById("classicProgScrub") || {value: 0}).value = p;
+    (document.getElementById("mobileProgScrub") || {value: 0}).value = p;
     updateBuffer();
     trackPlayProgress();
     } // end _doUI
@@ -41825,13 +42008,27 @@ function closeAndRun(fn) {
         wrap.classList.add('is-scrolling');
         return true;
     }
-    function setMarqueeWrapWidths() {
+    function _getMarqueeAvailableWidth() {
         const art = document.getElementById('npArt');
+        if (!art) return 0;
+        const artRight = art.getBoundingClientRect().right;
+        // On mobile, pbLikeBtn is hidden (getBCR returns all zeros).
+        // Fall back to the controls container left edge instead.
         const likeBtn = document.getElementById('pbLikeBtn');
-        if (art && likeBtn) {
-            const artRight = art.getBoundingClientRect().right;
-            const likeLeft = likeBtn.getBoundingClientRect().left;
-            const availableWidth = Math.max(0, likeLeft - artRight - 12);
+        const likeBtnRect = likeBtn ? likeBtn.getBoundingClientRect() : null;
+        let rightEdge = 0;
+        if (likeBtnRect && likeBtnRect.width > 0) {
+            rightEdge = likeBtnRect.left;
+        } else {
+            // Mobile fallback: use #playerBarControls left edge
+            const ctrl = document.getElementById('playerBarControls');
+            rightEdge = ctrl ? ctrl.getBoundingClientRect().left : window.innerWidth;
+        }
+        return Math.max(0, rightEdge - artRight - 12);
+    }
+    function setMarqueeWrapWidths() {
+        const availableWidth = _getMarqueeAvailableWidth();
+        if (availableWidth > 0) {
             document.querySelectorAll('.np-marquee-wrap').forEach(w => {
                 w.style.width = availableWidth + 'px';
             });
@@ -41839,12 +42036,8 @@ function closeAndRun(fn) {
     }
     function refreshMarquees() {
         observer.disconnect();
-        const art = document.getElementById('npArt');
-        const likeBtn = document.getElementById('pbLikeBtn');
-        if (art && likeBtn) {
-            const artRight = art.getBoundingClientRect().right;
-            const likeLeft = likeBtn.getBoundingClientRect().left;
-            const availableWidth = Math.max(0, likeLeft - artRight - 12);
+        const availableWidth = _getMarqueeAvailableWidth();
+        if (availableWidth > 0) {
             document.querySelectorAll('.np-marquee-wrap').forEach(w => {
                 w.style.width = availableWidth + 'px';
             });
