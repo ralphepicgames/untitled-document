@@ -11815,7 +11815,8 @@
 				transition: height 0.15s ease !important;
 			}
 			#classicPlayerBarProgressBg:hover,
-			#classicPlayerBarProgressBg.scrubbing {
+			#classicPlayerBarProgressBg.scrubbing,
+			#classicPlayerBarProgressBg.touching {
 				height: 10px !important;
 				border-radius: 5px !important;
 			}
@@ -11835,7 +11836,7 @@
 				cursor: pointer !important;
 				z-index: 5 !important;
 				-webkit-appearance: none !important;
-				touch-action: none !important;
+				pointer-events: none !important;
 			}
 
 			/* ── Hide desktop-only clutter ── */
@@ -43144,6 +43145,10 @@ function mobileBottomNav(screen, el) {
 document.querySelector('.player-bar')?.addEventListener('click', function(e) {
     if (window.innerWidth > 768) return;
     if (e.target.closest('button') || e.target.closest('input')) return;
+    // Don't open extended view when tapping the progress bar / scrub area
+    if (e.target.closest('#classicPlayerBarProgressBg') ||
+        e.target.closest('#playerBarProgressBg') ||
+        e.target.closest('.pb-classic-progress')) return;
     toggleDesktopExtended();
 });
 function openMobileExpandedDrawer(type) {
@@ -43950,7 +43955,8 @@ async function toggle8D() {
         const bgNew = document.getElementById('playerBarProgressBg');
         const fillNew = document.getElementById('progFill');
         const inputNew = document.getElementById('progScrub');
-        function startScrub(input) {
+
+        function startScrub() {
             if (bgClassic) bgClassic.classList.add('scrubbing');
             if (bgNew) bgNew.classList.add('scrubbing');
             if (fillClassic) fillClassic.style.transition = 'none';
@@ -43964,24 +43970,92 @@ async function toggle8D() {
                 if (fillNew) fillNew.style.transition = 'width 0.25s linear';
             });
         }
-        function syncFill(input) {
-            const pct = input.value + '%';
-            if (fillClassic) fillClassic.style.width = pct;
-            if (fillNew) fillNew.style.width = pct;
+        function syncFill(pct) {
+            const s = pct + '%';
+            if (fillClassic) fillClassic.style.width = s;
+            if (fillNew) fillNew.style.width = s;
         }
+
+        // ── Mouse handling (desktop) ──────────────────────────────────────────
+        if (inputClassic) {
+            inputClassic.addEventListener('mousedown', startScrub);
+            inputClassic.addEventListener('input', () => syncFill(inputClassic.value));
+        }
+        if (inputNew) {
+            inputNew.addEventListener('mousedown', startScrub);
+            inputNew.addEventListener('input', () => syncFill(inputNew.value));
+        }
+        window.addEventListener('mouseup', endScrub);
+
+        // ── Touch handling (mobile) ───────────────────────────────────────────
+        // We attach to the *background* element so the entire bar is a touch target,
+        // then compute percentage from touch X position manually.
+        // This avoids the iOS/Android native <input range> quirks with touch-action:none.
+        function getTouchPct(touch, bgEl) {
+            const rect = bgEl.getBoundingClientRect();
+            const x = Math.max(0, Math.min(touch.clientX - rect.left, rect.width));
+            return (x / rect.width) * 100;
+        }
+
+        function attachTouchScrub(bgEl, fillEl, inputEl) {
+            if (!bgEl) return;
+            let isTouching = false;
+
+            bgEl.addEventListener('touchstart', function(e) {
+                // Only handle single-finger touches on the bar
+                if (e.touches.length !== 1) return;
+                e.stopPropagation();
+                isTouching = true;
+                bgEl.classList.add('scrubbing', 'touching');
+                if (fillEl) fillEl.style.transition = 'none';
+                const pct = getTouchPct(e.touches[0], bgEl);
+                if (inputEl) inputEl.value = pct;
+                syncFill(pct);
+                if (typeof scrub === 'function') scrub(pct);
+                document.documentElement.style.setProperty('--mini-progress', pct + '%');
+            }, { passive: false });
+
+            bgEl.addEventListener('touchmove', function(e) {
+                if (!isTouching || e.touches.length !== 1) return;
+                e.preventDefault(); // prevent page scroll while scrubbing
+                e.stopPropagation();
+                const pct = getTouchPct(e.touches[0], bgEl);
+                if (inputEl) inputEl.value = pct;
+                syncFill(pct);
+                if (typeof scrub === 'function') scrub(pct);
+                document.documentElement.style.setProperty('--mini-progress', pct + '%');
+            }, { passive: false });
+
+            function onTouchEnd(e) {
+                if (!isTouching) return;
+                isTouching = false;
+                e.stopPropagation();
+                bgEl.classList.remove('scrubbing', 'touching');
+                requestAnimationFrame(() => {
+                    if (fillEl) fillEl.style.transition = 'width 0.25s linear';
+                });
+            }
+            bgEl.addEventListener('touchend', onTouchEnd, { passive: true });
+            bgEl.addEventListener('touchcancel', onTouchEnd, { passive: true });
+        }
+
+        // Attach touch scrubbing to the classic (mobile) progress bar
+        attachTouchScrub(bgClassic, fillClassic, inputClassic);
+        // Also attach to the new (top-of-bar) progress bar used on desktop
+        attachTouchScrub(bgNew, fillNew, inputNew);
+
+        // Absorb any synthesized click events on the progress bar elements
+        // so they don't bubble up to the player-bar and open the extended view
+        [bgClassic, bgNew, inputClassic, inputNew].forEach(el => {
+            if (el) el.addEventListener('click', e => e.stopPropagation());
+        });
+        const pbClassicProgress = document.querySelector('.pb-classic-progress');
+        if (pbClassicProgress) pbClassicProgress.addEventListener('click', e => e.stopPropagation());
+
+        // ── Desktop Extended / Fullscreen clean bar ───────────────────────────
         const bgDe = document.querySelector('.clean-bar-bg');
         const fillDe = document.getElementById('deProgFill');
         const inputDe = document.getElementById('deProgScrub');
-        if (inputClassic) {
-            inputClassic.addEventListener('mousedown', () => startScrub(inputClassic));
-            inputClassic.addEventListener('touchstart', () => startScrub(inputClassic), { passive: true });
-            inputClassic.addEventListener('input', () => syncFill(inputClassic));
-        }
-        if (inputNew) {
-            inputNew.addEventListener('mousedown', () => startScrub(inputNew));
-            inputNew.addEventListener('touchstart', () => startScrub(inputNew), { passive: true });
-            inputNew.addEventListener('input', () => syncFill(inputNew));
-        }
         if (inputDe) {
             inputDe.addEventListener('mousedown', () => {
                 if (bgDe) bgDe.classList.add('scrubbing');
@@ -43996,12 +44070,10 @@ async function toggle8D() {
             });
         }
         window.addEventListener('mouseup', () => {
-            endScrub();
             if (bgDe) bgDe.classList.remove('scrubbing');
             requestAnimationFrame(() => { if (fillDe) fillDe.style.transition = ''; });
         });
         window.addEventListener('touchend', () => {
-            endScrub();
             if (bgDe) bgDe.classList.remove('scrubbing');
             requestAnimationFrame(() => { if (fillDe) fillDe.style.transition = ''; });
         });
