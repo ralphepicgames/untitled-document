@@ -45153,20 +45153,43 @@ async function navigateToRealAlbumFolder(albumName, artistName, trackId) {
         if (!ctx || ctx._iosBgHooked) return;
         ctx._iosBgHooked = true;
         ctx.onstatechange = function() {
-            if (ctx.state === 'suspended') ctx.resume().catch(function(){});
+            if (ctx.state === 'suspended') {
+                // Lock pitch immediately so native fallback doesn't shift it
+                _setPitchLock(true);
+                ctx.resume().then(function() {
+                    if (_graphDisconnected) _reconnectGraph();
+                    _restampPitch();
+                }).catch(function(){});
+            } else if (ctx.state === 'running') {
+                if (_graphDisconnected) _reconnectGraph();
+                _restampPitch();
+            }
         };
+    }
+
+    function _setPitchLock(locked) {
+        // locked=true: preservesPitch ON (prevents pitch shift during native fallback)
+        // locked=false: restore to user's setting (preservesPitch OFF for speed effects)
+        [typeof player !== 'undefined' ? player : null,
+         typeof player2 !== 'undefined' ? player2 : null].forEach(function(el) {
+            if (!el) return;
+            el.preservesPitch = locked;
+            el.mozPreservesPitch = locked;
+            el.webkitPreservesPitch = locked;
+        });
     }
 
     function _disconnectGraph() {
         if (_graphDisconnected) return;
+        // Lock pitch BEFORE disconnecting so iOS native fallback doesn't pitch-shift
+        _setPitchLock(true);
         try { if (typeof sourceNode !== 'undefined' && sourceNode) sourceNode.disconnect(); } catch(e) {}
         try { if (typeof sourceNode2 !== 'undefined' && sourceNode2) sourceNode2.disconnect(); } catch(e) {}
         _graphDisconnected = true;
     }
 
     function _restampPitch() {
-        // Re-apply playback rate on both players after ctx resume/reconnect.
-        // iOS can drift the effective rate when AudioContext suspends/resumes.
+        // Restore user's playback rate + preservesPitch=false after reconnect
         var rate = (typeof effectsState !== 'undefined' && effectsState && effectsState.speed)
             ? effectsState.speed / 100 : 1;
         [typeof player !== 'undefined' ? player : null,
