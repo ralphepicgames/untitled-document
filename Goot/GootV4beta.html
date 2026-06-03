@@ -21278,6 +21278,10 @@ function openTrackActionsPopover(event, trackId, isPinned, isPlaylist, playlistN
         <button class="popover-item" onclick="closeTrackActionsPopover(); addTrackToOffline('${trackId}')">
             <i class="fa-solid fa-download"></i>
             <span>Add to Offline</span>
+        </button>
+        <button class="popover-item" onclick="closeTrackActionsPopover(); shareTrack('${trackId}')">
+            <i class="fa-solid fa-share-nodes"></i>
+            <span>Share</span>
         </button>`;
     if (partyState && partyState.active) {
         const canAddToParty = partyState.role === 'host' || !!(partyState.permissions && partyState.permissions[partyState.userId]?.canAdd);
