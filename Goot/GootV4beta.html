@@ -15237,6 +15237,7 @@ class LastFMIntegration {
         this.currentTrackScrobbled = false;
         this.listenedSeconds = 0;
         this._lastListenTimestamp = null;
+        this._lastCurrentTime = null;
         this.currentScrobbleTrackId = null;
         this.scrobbleHistory = [];
         this.nowPlayingTrack = null;
@@ -15495,6 +15496,7 @@ class LastFMIntegration {
         this.currentScrobbleTrackId = null;
         this.listenedSeconds = 0;
         this._lastListenTimestamp = null;
+        this._lastCurrentTime = null;
     }
 }
 const lastfm = new LastFMIntegration();
@@ -34669,16 +34671,17 @@ player.ontimeupdate = () => {
         if (lastfm.currentScrobbleTrackId !== currentTrack.id) {
             lastfm.currentScrobbleTrackId = currentTrack.id;
         }
-        const now = performance.now();
         if (!activePlayer.paused && !activePlayer.seeking) {
-            if (lastfm._lastListenTimestamp !== null) {
-                const elapsed = (now - lastfm._lastListenTimestamp) / 1000;
-                if (elapsed <= 1.5) {
-                    lastfm.listenedSeconds += elapsed;
+            const ct = activePlayer.currentTime;
+            if (lastfm._lastCurrentTime !== null && ct > lastfm._lastCurrentTime) {
+                const ctDelta = ct - lastfm._lastCurrentTime;
+                if (ctDelta < 2.0) { // guard against seeks
+                    lastfm.listenedSeconds += ctDelta;
                 }
             }
-            lastfm._lastListenTimestamp = now;
+            lastfm._lastCurrentTime = ct;
         } else {
+            lastfm._lastCurrentTime = null;
             lastfm._lastListenTimestamp = null;
         }
         const thresholdSeconds = Math.min(
@@ -34854,6 +34857,7 @@ player.onplay = () => {
         }
         lastfm.currentScrobbleTrackId = queue[qIndex].id;
         lastfm._lastListenTimestamp = null; // will be set fresh on next timeupdate tick
+        lastfm._lastCurrentTime = null;
     }
     if (lastfm && lastfm.enabled && queue[qIndex]) {
         const currentTrack = queue[qIndex];
@@ -34888,7 +34892,7 @@ player.onpause = () => {
     stopAudioVisualizer();
     updateMediaSessionPlaybackState();
     updateMediaSessionPositionState();
-    if (lastfm) lastfm._lastListenTimestamp = null;
+    if (lastfm) { lastfm._lastListenTimestamp = null; lastfm._lastCurrentTime = null; }
     window._npCurrentTrackData = null;
     console.log('[NowPlaying WS] playback stopped — sending nowplaying-clear');
     npOwnerSend({ type: 'nowplaying-clear' });
@@ -34920,6 +34924,7 @@ player2.onplay = () => {
         }
         lastfm.currentScrobbleTrackId = queue[qIndex].id;
         lastfm._lastListenTimestamp = null;
+        lastfm._lastCurrentTime = null;
     }
     if (lastfm && lastfm.enabled && queue[qIndex]) {
         const currentTrack = queue[qIndex];
@@ -34954,10 +34959,10 @@ player2.onpause = () => {
     stopAudioVisualizer();
     updateMediaSessionPlaybackState();
     updateMediaSessionPositionState();
-    if (lastfm) lastfm._lastListenTimestamp = null;
+    if (lastfm) { lastfm._lastListenTimestamp = null; lastfm._lastCurrentTime = null; }
 };
-player.addEventListener('seeking', () => { if (lastfm) lastfm._lastListenTimestamp = null; });
-player2.addEventListener('seeking', () => { if (lastfm) lastfm._lastListenTimestamp = null; });
+player.addEventListener('seeking', () => { if (lastfm) { lastfm._lastListenTimestamp = null; lastfm._lastCurrentTime = null; } });
+player2.addEventListener('seeking', () => { if (lastfm) { lastfm._lastListenTimestamp = null; lastfm._lastCurrentTime = null; } });
 // Show spinner during network stalls (waiting) and clear it when data resumes (canplay/playing)
 [player, player2].forEach(p => {
     p.addEventListener('waiting',  () => { if (currentPlayer === p) { _setPlayIcons('fa-solid fa-circle-notch fa-spin'); document.body.classList.add('track-loading'); } });
