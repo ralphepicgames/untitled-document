@@ -4687,30 +4687,31 @@
 			z-index: 1 !important;
 		}
 		body.album-layout-split #folderCoverTitle {
-			font-size: 28px !important;
+			font-size: 36px !important;
 			font-weight: 800 !important;
 			letter-spacing: -0.8px !important;
 			line-height: 1.05 !important;
 		}
-		body.album-layout-split #folderCoverLabel { font-size: 9px !important; letter-spacing: 2px !important; }
+		body.album-layout-split #folderCoverLabel { display: none !important; }
 		body.album-layout-split #folderCoverMeta { font-size: 13px !important; }
 		/* Responsive text sizing for split layout */
 		@media (min-width: 900px) {
-			body.album-layout-split #folderCoverTitle { font-size: 34px !important; }
+			body.album-layout-split #folderCoverTitle { font-size: 32px !important; }
 			body.album-layout-split #folderCoverMeta { font-size: 14px !important; }
 		}
 		@media (min-width: 1100px) {
-			body.album-layout-split #folderCoverTitle { font-size: 42px !important; }
+			body.album-layout-split #folderCoverTitle { font-size: 36px !important; }
 			body.album-layout-split #folderCoverMeta { font-size: 15px !important; }
 		}
 		@media (min-width: 1400px) {
-			body.album-layout-split #folderCoverTitle { font-size: 48px !important; }
+			body.album-layout-split #folderCoverTitle { font-size: 42px !important; }
 			body.album-layout-split #folderCoverMeta { font-size: 16px !important; }
 		}
 		body.album-layout-split #folderCoverActions { margin-top: 14px !important; }
 		/* Ratings column — sits directly on blurred art */
 		body.album-layout-split #aotySection {
-			width: 220px !important;
+			width: fit-content !important;
+			min-width: 0 !important;
 			flex-shrink: 0 !important;
 			border-radius: 0 !important;
 			border: none !important;
@@ -4718,26 +4719,29 @@
 			backdrop-filter: none !important;
 			-webkit-backdrop-filter: none !important;
 			align-self: stretch !important;
-			padding: 22px 18px !important;
+			padding: 22px 20px !important;
 			justify-content: center !important;
+			align-items: center !important;
 			position: relative !important;
 			z-index: 1 !important;
 		}
 		/* ── Redesigned base AOTY card (applies to all) ──────────────────── */
 		/* Horizontal scores layout — critic left, user right with pill divider */
 		#aotySection .aoty-scores-row {
-			flex-direction: row !important;
-			justify-content: space-around !important;
+			flex-direction: column !important;
+			align-items: center !important;
+			justify-content: center !important;
 			width: 100% !important;
-			gap: 8px !important;
+			gap: 20px !important;
+			text-align: center !important;
 		}
 		#aotySection .aoty-score-badge {
 			flex-direction: column !important;
 			align-items: center !important;
-			gap: 2px !important;
-			flex: 1 !important;
-			padding: 8px 6px !important;
-			border-radius: 12px !important;
+			gap: 0px !important;
+			flex: unset !important;
+			padding: 4px 6px !important;
+			border-radius: 10px !important;
 			background: transparent !important;
 			transition: background 0.15s !important;
 		}
@@ -4745,51 +4749,52 @@
 			background: color-mix(in srgb, var(--md-sys-color-primary) 10%, var(--md-sys-color-surface)) !important;
 		}
 		#aotySection .aoty-score-num {
-			font-size: 32px !important;
+			font-size: 36px !important;
 			letter-spacing: -2px !important;
 			line-height: 1 !important;
 		}
 		#aotySection .aoty-score-label {
-			font-size: 9px !important;
+			font-size: 11px !important;
 			letter-spacing: 1px !important;
 		}
 		#aotySection .aoty-score-count {
-			font-size: 9px !important;
-			opacity: 0.3 !important;
+			font-size: 11px !important;
+			opacity: 0.4 !important;
 		}
 		#aotySection .aoty-divider {
-			display: none !important;
+			display: block !important;
+			height: 1px !important;
+			width: 100% !important;
+			background: color-mix(in srgb, var(--md-sys-color-outline) 25%, transparent) !important;
+			margin: 1px 0 !important;
 		}
 		#aotySection .aoty-card-header {
-			margin-bottom: 10px !important;
+			display: none !important;
 		}
 		#aotySection .aoty-card-icon {
-			width: 26px !important;
-			height: 26px !important;
-			font-size: 11px !important;
-			border-radius: 8px !important;
+			width: 20px !important;
+			height: 20px !important;
+			font-size: 9px !important;
+			border-radius: 6px !important;
 		}
 		#aotySection .aoty-card-title {
-			font-size: 12px !important;
+			font-size: 10px !important;
 		}
 		#aotySection .aoty-link-pill {
-			font-size: 11px !important;
-			margin-top: 8px !important;
-			margin-left: -6px !important;
-			opacity: 0.6 !important;
+			display: none !important;
 		}
 		/* Responsive ratings section for split layout */
 		@media (min-width: 900px) {
 			#aotySection .aoty-score-num { font-size: 38px !important; }
-			#aotySection .aoty-card-title { font-size: 13px !important; }
+			#aotySection .aoty-card-title { font-size: 11px !important; }
 		}
 		@media (min-width: 1100px) {
-			#aotySection .aoty-score-num { font-size: 44px !important; }
-			#aotySection .aoty-card-title { font-size: 14px !important; }
+			#aotySection .aoty-score-num { font-size: 40px !important; }
+			#aotySection .aoty-card-title { font-size: 11px !important; }
 		}
 		@media (min-width: 1400px) {
-			#aotySection .aoty-score-num { font-size: 48px !important; }
-			#aotySection .aoty-card-title { font-size: 15px !important; }
+			#aotySection .aoty-score-num { font-size: 42px !important; }
+			#aotySection .aoty-card-title { font-size: 12px !important; }
 		}
 		/* ── Split layout — light mode overrides ────────────────────────── */
 		/* In dark mode the ::before blur is darkened (brightness 0.35) so white text
@@ -4881,19 +4886,20 @@
 			display: none;
 			flex-direction: column;
 			flex-shrink: 0;
-			width: 220px;
+			width: fit-content;
+			min-width: 0;
 			background: var(--md-sys-color-surface-variant);
-			border-radius: 24px;
+			border-radius: 18px;
 			border: 1px solid color-mix(in srgb, var(--md-sys-color-outline) 60%, transparent);
-			padding: 20px;
+			padding: 12px 16px;
 			box-sizing: border-box;
-			align-self: stretch;
+			align-self: flex-start;
 			transition: box-shadow 0.25s var(--motion-standard);
 		}
 		#aotySection.visible { display: flex; }
 		#aotySection:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.12); }
 		#aotyScoresRow {
-			flex: 1;
+			flex: unset;
 			display: flex;
 			align-items: center;
 		}
@@ -4904,6 +4910,7 @@
 		.aoty-card-header {
 			display: flex;
 			align-items: center;
+			justify-content: center;
 			gap: 10px;
 			margin-bottom: 16px;
 		}
@@ -4989,8 +4996,8 @@
 			padding: 6px 10px;
 			border-radius: 100px;
 			transition: background 0.2s var(--motion-standard);
-			align-self: flex-start;
-			margin-left: -10px;
+			align-self: center;
+			margin-left: 0;
 		}
 		.aoty-reviews-toggle { margin-top: 14px; }
 		.aoty-link-pill { margin-top: 2px; opacity: 0.7; }
@@ -5307,6 +5314,20 @@
 		}
 		.m3-btn-filled:hover{ box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4); }
 		.m3-btn-filled:active{ transform: translateY(0); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); }
+
+		/* ── Album banner action buttons — smaller than default m3-btn ─── */
+		#folderCoverActions .m3-btn {
+			padding: 7px 16px;
+			font-size: 12px;
+		}
+		#folderCoverActions .m3-btn i {
+			font-size: 13px;
+		}
+		#folderCoverActions .folder-ellipsis-btn {
+			width: 32px !important;
+			height: 32px;
+			padding: 0 !important;
+		}
 		.m3-btn-tonal {
 			background: var(--md-sys-color-primary-container);
 			color: var(--md-sys-color-primary);
@@ -12111,7 +12132,7 @@
 				min-width: 110px !important;
 			}
 			#aotySection { display: none !important; }
-			#folderCoverTitle{ font-size: 22px !important; line-height: 1.2 !important; }
+			#folderCoverTitle{ font-size: 26px !important; line-height: 1.2 !important; }
 			#folderCoverActions{ flex-wrap: wrap !important; }
 			/* ══════════════════════════════════════════════════════════════
 			   MOBILE EXPANDED VIEW — Material 3
@@ -13261,12 +13282,13 @@
 					</div>
 					<div style="display:flex;flex-direction:column;gap:10px;min-width:0;flex:1;justify-content:center;">
 						<div id="folderCoverLabel"
-							style="font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;opacity:0.4;">
+							style="display:none;">
 							Album</div>
 						<div id="folderCoverTitle"
-							style="font-size:42px;font-weight:700;letter-spacing:-0.5px;line-height:1.1;word-break:break-word;">
+							style="font-size:38px;font-weight:700;letter-spacing:-0.5px;line-height:1.1;word-break:break-word;">
 						</div>
-						<div id="folderCoverMeta" style="font-size:15px;opacity:0.5;margin-top:2px;"></div>
+						<div id="folderCoverMeta" style="font-size:20px;opacity:0.7;margin-top:2px;font-weight:500;"></div>
+						<div id="folderCoverReleaseDate" style="font-size:14px;opacity:0;margin-top:2px;letter-spacing:0.3px;transition:opacity 0.35s ease;min-height:1em;"></div>
 						<div id="folderCoverActions"
 							style="display:flex;gap:12px;margin-top:10px;flex-wrap:wrap;align-items:center;"></div>
 					</div>
@@ -13832,6 +13854,14 @@
 								</div>
 								<i class="fa-solid fa-chevron-right settings-nav-arrow"></i>
 							</button>
+							<label class="settings-nav-row" id="settings-nav-metadata-edit" style="display:none;cursor:pointer;">
+								<div class="settings-nav-icon"><i class="fa-solid fa-pen-to-square"></i></div>
+								<div class="settings-nav-text">
+									<div class="settings-nav-title">Metadata Editing</div>
+									<div class="settings-nav-sub">Edit track/album metadata inline</div>
+								</div>
+								<div class="m3-toggle"><input type="checkbox" id="metadataEditToggle" onchange="toggleMetadataEditing(this.checked)"><span class="m3-toggle-track"><span class="m3-toggle-thumb"></span></span></div>
+							</label>
 							<button class="settings-nav-row" id="settings-nav-redirect" onclick="openSettingsSection('redirect')" style="display:none;">
 								<div class="settings-nav-icon"><i class="fa-solid fa-arrow-right-arrow-left"></i></div>
 								<div class="settings-nav-text">
@@ -20188,6 +20218,8 @@ async function loadFolders(id, refresh = false) {
         _albumBgEl.classList.remove('visible');
         _albumBgEl.dataset.bgUrl = ''; // force fresh load on next album open
     }
+    const _rdEl = document.getElementById('folderCoverReleaseDate');
+    if (_rdEl) { _rdEl.style.transition = 'none'; _rdEl.style.opacity = '0'; _rdEl.textContent = ''; requestAnimationFrame(() => { _rdEl.style.transition = ''; }); }
     const _wasAlbumView = document.getElementById('library-screen')?.classList.contains('album-view');
     if (_wasAlbumView) grid.style.display = 'none';
     const _ls = document.getElementById('library-screen');
@@ -20360,7 +20392,7 @@ async function loadFolders(id, refresh = false) {
                         const album = item.album || 'Unknown';
                         const albumKey = generateAlbumKey(item.artist, album);
                         const existing = trackMetadata[item.id] || {};
-                        trackMetadata[item.id] = { ...existing, title: item.title || existing.title || 'Unknown Track', artist: item.artist || existing.artist || 'Unknown Artist', album, year: item.year || existing.year || null, genre: item.genre || existing.genre || null, albumArt: albumToArt.get(albumKey) || item.thumbnailLink || existing.albumArt || '', albumKey, duration: item.duration || existing.duration || null };
+                        trackMetadata[item.id] = { ...existing, title: item.title || existing.title || 'Unknown Track', artist: item.artist || existing.artist || 'Unknown Artist', album, year: item.year || existing.year || null, genre: item.genre || existing.genre || null, albumArt: albumToArt.get(albumKey) || item.thumbnailLink || existing.albumArt || '', albumKey, duration: item.duration || existing.duration || null, release_date: item.release_date || existing.release_date || null };
                         saveCompleteTrackMetadata(item.id, trackMetadata[item.id]).catch(() => {});
                     });
                     if (typeof _prefetchAOTYCache === 'function') {
@@ -20736,12 +20768,13 @@ async function loadFolders(id, refresh = false) {
                     if (!item?.id) return;
                     const existing = trackMetadata[item.id] || {};
                     const merged = { ...existing };
-                    if (item.title)    merged.title    = item.title;
-                    if (item.artist)   merged.artist   = item.artist;
-                    if (item.album)    merged.album    = item.album;
-                    if (item.duration) merged.duration = item.duration;
-                    if (item.year)     merged.year     = item.year;
-                    if (item.genre)    merged.genre    = item.genre;
+                    if (item.title)        merged.title        = item.title;
+                    if (item.artist)       merged.artist       = item.artist;
+                    if (item.album)        merged.album        = item.album;
+                    if (item.duration)     merged.duration     = item.duration;
+                    if (item.year)         merged.year         = item.year;
+                    if (item.genre)        merged.genre        = item.genre;
+                    if (item.release_date) merged.release_date = item.release_date;
                     trackMetadata[item.id] = merged;
                     if (item.duration) {
                         saveCompleteTrackMetadata(item.id, merged).catch(() => {});
@@ -20870,6 +20903,34 @@ async function loadFolders(id, refresh = false) {
                     const bestArtist = mostCommon(metaArtists);
                     if (bestAlbum) coverTitleEl.textContent = bestAlbum;
                     if (bestArtist) coverMetaEl.textContent = bestArtist;
+                    const relDateEl = document.getElementById('folderCoverReleaseDate');
+                    if (relDateEl) {
+                        const rd = tracks.map(t => trackMetadata[t.id]?.release_date).find(v => v);
+                        if (rd) { relDateEl.textContent = _formatReleaseDate(rd); requestAnimationFrame(() => { relDateEl.style.opacity = '0.45'; }); }
+                        else { relDateEl.textContent = ''; relDateEl.style.opacity = '0'; }
+                    }
+                })();
+                // Fetch release_date for this album — always fetch to keep trackMetadata warm,
+                // but only update the DOM if the date isn't already showing (prevents pop-in)
+                (function fetchReleaseDateForBanner() {
+                    const sampleIds = tracks.slice(0, 5).map(t => t.id);
+                    if (!sampleIds.length) return;
+                    fetch(`${PLAYER_WORKER_URL}/metadata/batch`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ids: sampleIds })
+                    }).then(r => r.ok ? r.json() : null).then(data => {
+                        const rd = (data?.results || []).map(r => r.release_date).find(v => v);
+                        if (!rd) return;
+                        // Always write into trackMetadata so next visit finds it immediately
+                        tracks.forEach(t => { if (trackMetadata[t.id]) trackMetadata[t.id].release_date = rd; });
+                        // Fade in — whether already visible or not, transition handles it gracefully
+                        const relDateEl = document.getElementById('folderCoverReleaseDate');
+                        if (relDateEl && !relDateEl.textContent.trim()) {
+                            relDateEl.textContent = _formatReleaseDate(rd);
+                            requestAnimationFrame(() => { relDateEl.style.opacity = '0.45'; });
+                        }
+                    }).catch(() => {});
                 })();
                 const coverMetaListener = (updatedIds) => {
                     const relevant = tracks.some(t => updatedIds.includes(t.id));
@@ -20882,6 +20943,12 @@ async function loadFolders(id, refresh = false) {
                     const metaEl2 = document.getElementById('folderCoverMeta');
                     if (titleEl2 && bestAlbum) { titleEl2.textContent = cleanDisplayName(bestAlbum); if (currentAlbumView) currentAlbumView.album.album = cleanDisplayName(bestAlbum); }
                     if (metaEl2 && bestArtist) { metaEl2.textContent = bestArtist; if (currentAlbumView) currentAlbumView.album.artist = bestArtist; }
+                    const relDateEl2 = document.getElementById('folderCoverReleaseDate');
+                    if (relDateEl2) {
+                        const rd = tracks.map(t => trackMetadata[t.id]?.release_date).find(v => v);
+                        if (rd) { relDateEl2.textContent = _formatReleaseDate(rd); requestAnimationFrame(() => { relDateEl2.style.opacity = '0.45'; }); }
+                        else { relDateEl2.textContent = ''; relDateEl2.style.opacity = '0'; }
+                    }
                     if (!_bgSet) {
                         const firstWithArt = tracks.find(t => {
                             const al = trackMetadata[t.id]?.album || t.album || '';
@@ -28145,6 +28212,8 @@ function _redirectTapUnlock() {
             if (chartRenameBtn) chartRenameBtn.style.display = '';
             const folderMapBtn = document.getElementById('settings-nav-folder-map');
             if (folderMapBtn) folderMapBtn.style.display = '';
+            const metaEditRow = document.getElementById('settings-nav-metadata-edit');
+            if (metaEditRow) metaEditRow.style.display = '';
             showNotification('🔓 Admin tools unlocked');
         }
     } else {
@@ -44470,27 +44539,23 @@ async function toggle8D() {
         const userCount   = data.user?.count   || null;
         const pageUrl     = data.url || 'https://www.albumoftheyear.org';
         let html = '';
-        if (criticScore !== null && !isNaN(criticScore)) {
-            html += `
-            <div class="aoty-score-badge">
-                <span class="aoty-score-num ${_scoreClass(criticScore)}">${criticScore}</span>
-                <div class="aoty-score-badge-labels">
-                    <span class="aoty-score-label">Critic</span>
-                    ${criticCount ? `<span class="aoty-score-count">${criticCount} reviews</span>` : ''}
-                </div>
-            </div>`;
-            if (userScore !== null && !isNaN(userScore)) {
-                html += `<div class="aoty-divider"></div>`;
-            }
-        }
         if (userScore !== null && !isNaN(userScore)) {
             html += `
             <div class="aoty-score-badge">
+                <span class="aoty-score-label">User</span>
                 <span class="aoty-score-num ${_scoreClass(userScore)}">${userScore}</span>
-                <div class="aoty-score-badge-labels">
-                    <span class="aoty-score-label">User</span>
-                    ${userCount ? `<span class="aoty-score-count">${userCount} ratings</span>` : ''}
-                </div>
+                ${userCount ? `<span class="aoty-score-count">${userCount} ratings</span>` : ''}
+            </div>`;
+            if (criticScore !== null && !isNaN(criticScore)) {
+                html += `<div class="aoty-divider"></div>`;
+            }
+        }
+        if (criticScore !== null && !isNaN(criticScore)) {
+            html += `
+            <div class="aoty-score-badge">
+                <span class="aoty-score-label">Critic</span>
+                <span class="aoty-score-num ${_scoreClass(criticScore)}">${criticScore}</span>
+                ${criticCount ? `<span class="aoty-score-count">${criticCount} reviews</span>` : ''}
             </div>`;
         }
         if (!html) {
@@ -45131,10 +45196,24 @@ async function navigateToRealAlbumFolder(albumName, artistName, trackId) {
     if (mappedAlbum) {
         const libraryNavItem = document.querySelector('.nav-item[data-screen="library"]');
         if (libraryNavItem && !libraryNavItem.classList.contains('active')) nav(libraryNavItem);
+        // Use _npFolderSearch to resolve full ancestor path so:
+        // 1) stack.length >= 3 → triggers album-view (showAlbumView = depth >= 3)
+        // 2) breadcrumb shows complete hierarchy (Home > Artist > Album)
+        const result = await _npFolderSearch(albumName, _npPrimaryArtist(artistName), false, trackId).catch(() => null);
         stack.length = 0;
-        stack.push({ id: ROOT_ID, name: 'Home' });
-        stack.push({ id: mappedAlbum.folderId, name: mappedAlbum.folderName });
-        await loadFolders(mappedAlbum.folderId);
+        if (result?.path?.length > 0) {
+            result.path.forEach(p => stack.push(p));
+            const last = result.path[result.path.length - 1];
+            const targetId = result.albumFolderId || mappedAlbum.folderId;
+            if (last.id !== targetId) stack.push({ id: targetId, name: mappedAlbum.folderName });
+        } else {
+            // _npFolderSearch missed (e.g. folder not indexed yet) — fall back to
+            // injecting a synthetic parent so depth >= 3 still triggers album-view
+            stack.push({ id: ROOT_ID, name: 'Home' });
+            stack.push({ id: mappedAlbum.folderId + '_parent', name: mappedAlbum.folderName, synthetic: true });
+            stack.push({ id: mappedAlbum.folderId, name: mappedAlbum.folderName });
+        }
+        await loadFolders(stack[stack.length - 1].id);
         showShareToast('Opened: ' + mappedAlbum.folderName, 'success');
         return;
     }
@@ -45287,5 +45366,325 @@ async function navigateToRealAlbumFolder(albumName, artistName, trackId) {
 
 })();
 </script>
-</body>
-</html>
+<script>
+// ── Metadata Editing ──────────────────────────────────────────────────────────
+let _metaEditEnabled = false;
+const _META_ADMIN_KEY = 'penis';
+
+function _formatReleaseDate(d) {
+    if (!d) return '';
+    // Handle YYYY, YYYY-MM, YYYY-MM-DD
+    const parts = d.split('-');
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    if (parts.length === 1) return parts[0]; // just year
+    if (parts.length === 2) return `${months[parseInt(parts[1],10)-1]} ${parts[0]}`; // Month YYYY
+    return `${months[parseInt(parts[1],10)-1]} ${parseInt(parts[2],10)}, ${parts[0]}`; // Month D, YYYY
+}
+
+function toggleMetadataEditing(on) {
+    _metaEditEnabled = on;
+    document.body.classList.toggle('meta-edit-mode', on);
+    if (on) _applyMetaEditToCurrentView();
+    else _removeMetaEditFromCurrentView();
+    showNotification(on ? '✏️ Metadata editing ON' : '🔒 Metadata editing OFF');
+}
+
+function _applyMetaEditToCurrentView() {
+    _applyMetaEditToAlbumBanner();
+    _applyMetaEditToRows();
+    document.querySelectorAll('.folder-card[data-folder-id]').forEach(c => _applyMetaEditToCard(c));
+    document.querySelectorAll('.folder-card[data-track-id]').forEach(c => _applyMetaEditToSingleCard(c));
+}
+
+function _removeMetaEditFromCurrentView() {
+    // Restore album banner
+    const titleEl = document.getElementById('folderCoverTitle');
+    const metaEl = document.getElementById('folderCoverMeta');
+    if (titleEl && titleEl.dataset.origText) { titleEl.textContent = titleEl.dataset.origText; delete titleEl.dataset.origText; }
+    if (metaEl && metaEl.dataset.origText) { metaEl.textContent = metaEl.dataset.origText; delete metaEl.dataset.origText; }
+    // Remove release date row if exists
+    const rdRow = document.getElementById('_metaEditReleaseDateRow');
+    if (rdRow) rdRow.remove();
+    // Restore track rows
+    document.querySelectorAll('.song-row[data-track-id]').forEach(row => _restoreRowEditing(row));
+    // Restore folder cards
+    document.querySelectorAll('.folder-card[data-folder-id]').forEach(card => _restoreCardEditing(card));
+    document.querySelectorAll('.folder-card[data-track-id]').forEach(card => _restoreCardEditing(card));
+}
+
+function _makeEditable(el, onSave) {
+    if (el._metaEditable) return;
+    el._metaEditable = true;
+    el.style.cursor = 'text';
+    el.title = 'Click to edit';
+    el.addEventListener('click', function startEdit(e) {
+        e.stopPropagation();
+        if (el.querySelector('input')) return;
+        const orig = el.textContent.trim();
+        const input = document.createElement('input');
+        input.value = orig;
+        input.style.cssText = 'background:color-mix(in srgb,var(--md-sys-color-surface-variant) 60%,transparent);border:none;border-bottom:2px solid var(--md-sys-color-primary);outline:none;font:inherit;color:inherit;width:100%;padding:2px 4px;border-radius:4px 4px 0 0;';
+        el.textContent = '';
+        el.appendChild(input);
+        input.focus();
+        input.select();
+        const finish = async (save) => {
+            const val = input.value.trim();
+            input.remove();
+            el.textContent = save && val ? val : orig;
+            if (save && val && val !== orig) {
+                try { await onSave(val); showNotification('✅ Saved'); }
+                catch(err) { showNotification('❌ Error: ' + err.message); el.textContent = orig; }
+            }
+        };
+        input.addEventListener('keydown', e => {
+            if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+            if (e.key === 'Escape') finish(false);
+        });
+        input.addEventListener('blur', () => finish(true));
+    });
+}
+
+async function _saveTrackMeta(id, fields) {
+    const r = await fetch(`${PLAYER_WORKER_URL}/d1-admin/update-track-metadata?key=${_META_ADMIN_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, fields })
+    });
+    if (!r.ok) throw new Error(await r.text());
+    // Update local cache
+    if (trackMetadata[id]) Object.assign(trackMetadata[id], fields);
+}
+
+async function _saveAlbumMeta(album, artist, fields) {
+    const r = await fetch(`${PLAYER_WORKER_URL}/d1-admin/update-track-metadata?key=${_META_ADMIN_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ album, artist, fields })
+    });
+    if (!r.ok) throw new Error(await r.text());
+    // Update local cache
+    Object.values(trackMetadata).forEach(m => {
+        if (m.album === album && (!artist || m.artist === artist)) Object.assign(m, fields);
+    });
+}
+
+// Album banner editing (title + artist + release date)
+function _applyMetaEditToAlbumBanner() {
+    const titleEl = document.getElementById('folderCoverTitle');
+    const metaEl = document.getElementById('folderCoverMeta');
+    if (!titleEl || !metaEl) return;
+    // Only in album view
+    const screen = document.getElementById('library-screen');
+    if (!screen || !screen.classList.contains('album-view')) return;
+
+    const album = titleEl.textContent.trim();
+    const artist = metaEl.textContent.trim();
+    titleEl.dataset.origText = album;
+    metaEl.dataset.origText = artist;
+
+    _makeEditable(titleEl, async (val) => {
+        await _saveAlbumMeta(album, artist, { album: val });
+        titleEl.dataset.origText = val;
+    });
+    _makeEditable(metaEl, async (val) => {
+        await _saveAlbumMeta(album, artist, { artist: val });
+        metaEl.dataset.origText = val;
+    });
+
+    // Add release date row if not already there
+    if (!document.getElementById('_metaEditReleaseDateRow')) {
+        // Get release_date from first track in view
+        const firstTrackId = document.querySelector('.song-row[data-track-id]')?.dataset?.trackId;
+        const existingDate = firstTrackId ? (trackMetadata[firstTrackId]?.release_date || '') : '';
+        const actionsEl = document.getElementById('folderCoverActions');
+        if (actionsEl) {
+            const rdRow = document.createElement('div');
+            rdRow.id = '_metaEditReleaseDateRow';
+            rdRow.style.cssText = 'display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap;';
+            rdRow.innerHTML = `
+                <span style="font-size:12px;opacity:0.5;font-weight:600;letter-spacing:0.5px;">RELEASE</span>
+                <input id="_metaEditReleaseDateInput" placeholder="YYYY-MM-DD" value="${existingDate}"
+                    style="background:color-mix(in srgb,var(--md-sys-color-surface-variant) 60%,transparent);border:none;border-bottom:2px solid var(--md-sys-color-primary);outline:none;font-size:13px;color:inherit;padding:2px 6px;border-radius:4px 4px 0 0;width:120px;">
+                <button id="_metaEditFetchDateBtn" title="Look up release date" style="font-size:12px;padding:4px 10px;border-radius:6px;background:color-mix(in srgb,var(--md-sys-color-surface-variant) 80%,transparent);color:inherit;border:none;cursor:pointer;display:flex;align-items:center;gap:5px;" onclick="_fetchAlbumReleaseDate()">
+                    <i class="fa-solid fa-magnifying-glass"></i> Look up
+                </button>
+                <button style="font-size:12px;padding:4px 10px;border-radius:6px;background:var(--md-sys-color-primary);color:var(--md-sys-color-on-primary);border:none;cursor:pointer;" onclick="_saveAlbumReleaseDate()">Save</button>
+                <div id="_metaEditDateResult" style="display:none;width:100%;margin-top:4px;padding:8px 10px;border-radius:8px;background:color-mix(in srgb,var(--md-sys-color-surface-variant) 60%,transparent);font-size:12px;"></div>`;
+            actionsEl.parentNode.insertBefore(rdRow, actionsEl);
+        }
+    }
+}
+
+async function _fetchAlbumReleaseDate() {
+    const btn = document.getElementById('_metaEditFetchDateBtn');
+    const resultEl = document.getElementById('_metaEditDateResult');
+    const inp = document.getElementById('_metaEditReleaseDateInput');
+    const titleEl = document.getElementById('folderCoverTitle');
+    const metaEl = document.getElementById('folderCoverMeta');
+    const album = titleEl?.dataset?.origText || titleEl?.textContent?.trim() || '';
+    const artist = metaEl?.dataset?.origText || metaEl?.textContent?.trim() || '';
+    if (!album) { showNotification('No album name'); return; }
+
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Searching…';
+    btn.disabled = true;
+    resultEl.style.display = 'none';
+
+    try {
+        // MusicBrainz release search — no auth needed, free
+        const q = encodeURIComponent(`release:"${album}"${artist ? ` AND artist:"${artist}"` : ''}`);
+        const res = await fetch(`https://musicbrainz.org/ws/2/release/?query=${q}&limit=5&fmt=json`, {
+            headers: { 'User-Agent': 'GootPlayer/1.0 (music player)' }
+        });
+        if (!res.ok) throw new Error('MusicBrainz returned ' + res.status);
+        const data = await res.json();
+        const releases = (data.releases || []).filter(r => r.date && r.date.length >= 4);
+
+        if (!releases.length) {
+            resultEl.style.display = 'block';
+            resultEl.innerHTML = '<span style="opacity:0.5;">No results found on MusicBrainz</span>';
+            return;
+        }
+
+        resultEl.style.display = 'block';
+        resultEl.innerHTML = releases.slice(0, 4).map(r => {
+            const label = r['label-info']?.[0]?.label?.name || '';
+            const country = r.country || '';
+            const disambiguation = r.disambiguation ? ` <em style="opacity:0.4;">(${r.disambiguation})</em>` : '';
+            return `<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid color-mix(in srgb,var(--md-sys-color-outline) 15%,transparent);">
+                <strong style="font-size:13px;min-width:90px;">${r.date}</strong>
+                <span style="opacity:0.55;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${r.title}${disambiguation}${country ? ' · ' + country : ''}${label ? ' · ' + label : ''}</span>
+                <button onclick="_confirmReleaseDate('${r.date}')" style="font-size:11px;padding:3px 8px;border-radius:5px;background:var(--md-sys-color-primary);color:var(--md-sys-color-on-primary);border:none;cursor:pointer;flex-shrink:0;">Use</button>
+            </div>`;
+        }).join('');
+    } catch(e) {
+        resultEl.style.display = 'block';
+        resultEl.innerHTML = `<span style="color:#ef4444;">Error: ${e.message}</span>`;
+    } finally {
+        btn.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i> Look up';
+        btn.disabled = false;
+    }
+}
+
+function _confirmReleaseDate(date) {
+    const inp = document.getElementById('_metaEditReleaseDateInput');
+    if (inp) inp.value = date;
+    document.getElementById('_metaEditDateResult').style.display = 'none';
+    showNotification(`📅 ${date} — click Save to confirm`);
+}
+
+async function _saveAlbumReleaseDate() {
+    const inp = document.getElementById('_metaEditReleaseDateInput');
+    if (!inp) return;
+    const val = inp.value.trim();
+    const titleEl = document.getElementById('folderCoverTitle');
+    const metaEl = document.getElementById('folderCoverMeta');
+    const album = titleEl?.dataset?.origText || titleEl?.textContent?.trim() || '';
+    const artist = metaEl?.dataset?.origText || metaEl?.textContent?.trim() || '';
+    try {
+        await _saveAlbumMeta(album, artist, { release_date: val });
+        const relDateEl = document.getElementById('folderCoverReleaseDate');
+        if (relDateEl) { relDateEl.textContent = _formatReleaseDate(val); requestAnimationFrame(() => { relDateEl.style.opacity = val ? '0.45' : '0'; }); }
+        showNotification('✅ Release date saved');
+    } catch(e) { showNotification('❌ ' + e.message); }
+}
+
+// Track row editing
+function _applyMetaEditToRows() {
+    document.querySelectorAll('.song-row[data-track-id]').forEach(row => _applyRowEditing(row));
+}
+
+function _applyRowEditing(row) {
+    if (row._metaEditApplied) return;
+    row._metaEditApplied = true;
+    const id = row.dataset.trackId;
+    if (!id) return;
+    const titleEl = row.querySelector('.song-row-title');
+    const artistEl = row.querySelector('.song-row-artist');
+    const albumTd = row.querySelector('.song-row-album');
+    if (titleEl) _makeEditable(titleEl, val => _saveTrackMeta(id, { title: val }));
+    if (artistEl) _makeEditable(artistEl, val => _saveTrackMeta(id, { artist: val }));
+    if (albumTd) _makeEditable(albumTd, val => _saveTrackMeta(id, { album: val }));
+}
+
+function _restoreRowEditing(row) {
+    delete row._metaEditApplied;
+    ['.song-row-title', '.song-row-artist', '.song-row-album'].forEach(sel => {
+        const el = row.querySelector(sel);
+        if (el) { el._metaEditable = false; el.style.cursor = ''; el.title = ''; }
+    });
+}
+
+// Folder card (album card) name editing
+function _applyMetaEditToCard(card) {
+    if (card._metaEditApplied) return;
+    card._metaEditApplied = true;
+    const nameEl = card.querySelector('.folder-info > span');
+    if (!nameEl) return;
+    const folderId = card.dataset.folderId;
+    _makeEditable(nameEl, async (val) => {
+        // We save to all tracks in this album folder
+        const folderName = card.dataset.folderName || nameEl.textContent.trim();
+        const artistEl2 = card.querySelector('.folder-artist');
+        const artist = artistEl2?.textContent?.trim() || '';
+        // Find tracks from this folder via cache
+        const cached = folderContentsCache?.get(folderId);
+        if (cached) {
+            const ids = cached.data.filter(f => f.mimeType?.includes('audio') || f.mimeType?.startsWith('video/')).map(f => f.id);
+            await Promise.all(ids.map(tid => _saveTrackMeta(tid, { album: val })));
+        } else {
+            await _saveAlbumMeta(folderName, artist, { album: val });
+        }
+    });
+}
+
+// Single track card editing (folder-card with data-track-id)
+function _applyMetaEditToSingleCard(card) {
+    if (card._metaEditApplied) return;
+    card._metaEditApplied = true;
+    const id = card.dataset.trackId;
+    if (!id) return;
+    const nameEl = card.querySelector('.folder-info > span');
+    const artistEl = card.querySelector('.folder-artist');
+    if (nameEl) _makeEditable(nameEl, val => _saveTrackMeta(id, { title: val }));
+    if (artistEl) _makeEditable(artistEl, val => _saveTrackMeta(id, { artist: val }));
+}
+
+function _restoreCardEditing(card) {
+    delete card._metaEditApplied;
+    const nameEl = card.querySelector('.folder-info > span');
+    if (nameEl) { nameEl._metaEditable = false; nameEl.style.cursor = ''; nameEl.title = ''; }
+}
+
+// Hook into existing row/card rendering
+const _origBuildRows = typeof buildTrackRows === 'function' ? buildTrackRows : null;
+// Observe DOM for new rows and cards
+const _metaEditObserver = new MutationObserver((muts) => {
+    if (!_metaEditEnabled) return;
+    muts.forEach(m => m.addedNodes.forEach(n => {
+        if (!n.querySelectorAll) return;
+        n.querySelectorAll?.('.song-row[data-track-id]').forEach(r => _applyRowEditing(r));
+        if (n.classList?.contains('song-row') && n.dataset?.trackId) _applyRowEditing(n);
+        n.querySelectorAll?.('.folder-card[data-folder-id]').forEach(c => _applyMetaEditToCard(c));
+        if (n.classList?.contains('folder-card') && n.dataset?.folderId) _applyMetaEditToCard(n);
+        n.querySelectorAll?.('.folder-card[data-track-id]').forEach(c => _applyMetaEditToSingleCard(c));
+        if (n.classList?.contains('folder-card') && n.dataset?.trackId) _applyMetaEditToSingleCard(n);
+    }));
+    // Also refresh album banner when it appears
+    if (_metaEditEnabled) {
+        const screen = document.getElementById('library-screen');
+        if (screen?.classList.contains('album-view')) _applyMetaEditToAlbumBanner();
+    }
+});
+document.addEventListener('DOMContentLoaded', () => {
+    const lib = document.getElementById('library-screen');
+    if (lib) _metaEditObserver.observe(lib, { childList: true, subtree: true });
+    // Also observe body for album-view class change
+    const bodyObs = new MutationObserver(() => {
+        if (!_metaEditEnabled) return;
+        const screen = document.getElementById('library-screen');
+        if (screen?.classList.contains('album-view')) setTimeout(_applyMetaEditToAlbumBanner, 200);
+    });
+    bodyObs.observe(document.getElementById('library-screen') || document.body, { attributes: true, attributeFilter: ['class'] });
+});
+</script>
