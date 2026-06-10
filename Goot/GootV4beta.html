@@ -37830,8 +37830,8 @@ async function loadLyrics(trackId, target = 'sidebar', options = {}) {
 async function _tryLyricsplusAPI(title, artist, album, durationSecs, isrc) {
     async function _lpFetch() {
         const endpoints = [
-            'https://lyricsplus.prjktla.workers.dev/v2/lyrics/get',
             'https://lyrics.geeked.wtf/v2/lyrics/get',
+            'https://lyricsplus.prjktla.workers.dev/v2/lyrics/get',
         ];
         const params = new URLSearchParams({
             title:    title,
