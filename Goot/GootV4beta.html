@@ -37829,7 +37829,10 @@ async function loadLyrics(trackId, target = 'sidebar', options = {}) {
 }
 async function _tryLyricsplusAPI(title, artist, album, durationSecs, isrc) {
     async function _lpFetch() {
-        const base = 'https://lyricsplus.prjktla.workers.dev/v2/lyrics/get';
+        const endpoints = [
+            'https://lyricsplus.prjktla.workers.dev/v2/lyrics/get',
+            'https://lyrics.geeked.wtf/v2/lyrics/get',
+        ];
         const params = new URLSearchParams({
             title:    title,
             artist:   artist,
@@ -37837,15 +37840,22 @@ async function _tryLyricsplusAPI(title, artist, album, durationSecs, isrc) {
             duration: durationSecs || 0,
         });
         if (isrc) params.set('isrc', isrc);
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 15000);
-        try {
-            const resp = await fetch(`${base}?${params}`, { cache: 'no-store', signal: controller.signal });
-            if (!resp.ok) return null;
-            return await resp.json();
-        } finally {
-            clearTimeout(timeout);
+        for (const base of endpoints) {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 15000);
+            try {
+                const resp = await fetch(`${base}?${params}`, { cache: 'no-store', signal: controller.signal });
+                if (!resp.ok) { clearTimeout(timeout); continue; }
+                const json = await resp.json();
+                clearTimeout(timeout);
+                return json;
+            } catch (e) {
+                clearTimeout(timeout);
+                console.warn(`[LyricsPlus] endpoint failed (${base}):`, e);
+                // try next
+            }
         }
+        return null;
     }
     function _isTrulyWordLevel(lyricsArray) {
         if (!Array.isArray(lyricsArray) || lyricsArray.length === 0) return false;
