@@ -62,6 +62,7 @@
 	</style>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/browser-id3-writer@5/dist/browser-id3-writer.js"></script>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
 	<script src="https://cdn.dashjs.org/latest/dash.all.min.js"></script>
@@ -4680,8 +4681,9 @@
 		/* Info — transparent background, sits above blurred banner */
 		body.album-layout-split #folderCoverBanner > div:not(#folderCoverArt):not(#aotySection) {
 			flex: 1 !important;
-			padding: 28px 20px 24px 52px !important;
-			justify-content: center !important;
+			padding: 28px 28px 24px 40px !important;
+			justify-content: space-between !important;
+			align-self: stretch !important;
 			background: transparent !important;
 			position: relative !important;
 			z-index: 1 !important;
@@ -5315,18 +5317,36 @@
 		.m3-btn-filled:hover{ box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4); }
 		.m3-btn-filled:active{ transform: translateY(0); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); }
 
-		/* ── Album banner action buttons — smaller than default m3-btn ─── */
-		#folderCoverActions .m3-btn {
-			padding: 7px 16px;
-			font-size: 12px;
+		/* ── Album banner action buttons — queue-style stacked icon/label ─── */
+		#folderCoverActions {
+			gap: 8px !important;
 		}
-		#folderCoverActions .m3-btn i {
-			font-size: 13px;
+		#folderCoverActions .album-cover-action-btn {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			gap: 5px;
+			padding: 12px 18px;
+			border-radius: 12px;
+			background: rgba(0,0,0,0.35);
+			border: 1px solid rgba(255,255,255,0.08);
+			backdrop-filter: blur(6px);
+			-webkit-backdrop-filter: blur(6px);
+			min-width: 76px;
+			transition: all 0.18s ease;
+			color: rgba(255,255,255,0.92) !important;
 		}
-		#folderCoverActions .folder-ellipsis-btn {
-			width: 32px !important;
-			height: 32px;
-			padding: 0 !important;
+		#folderCoverActions .album-cover-action-btn:hover {
+			background: rgba(0,0,0,0.5);
+			border-color: rgba(255,255,255,0.15);
+		}
+		#folderCoverActions .album-cover-action-btn i {
+			font-size: 17px;
+		}
+		#folderCoverActions .album-cover-action-btn span {
+			font-size: 11px;
+			font-weight: 600;
+			letter-spacing: 0.3px;
 		}
 		.m3-btn-tonal {
 			background: var(--md-sys-color-primary-container);
@@ -13281,14 +13301,17 @@
 						<i class="fa-solid fa-music" style="font-size:52px;opacity:0.2;"></i>
 					</div>
 					<div style="display:flex;flex-direction:column;gap:10px;min-width:0;flex:1;justify-content:center;">
-						<div id="folderCoverLabel"
-							style="display:none;">
-							Album</div>
-						<div id="folderCoverTitle"
-							style="font-size:38px;font-weight:700;letter-spacing:-0.5px;line-height:1.1;word-break:break-word;">
+						<div style="display:flex;flex-direction:column;gap:10px;min-width:0;">
+							<div id="folderCoverLabel"
+								style="display:none;">
+								Album</div>
+							<div id="folderCoverTitle"
+								style="font-size:38px;font-weight:700;letter-spacing:-0.5px;line-height:1.1;word-break:break-word;">
+							</div>
+							<div id="folderCoverMeta" style="font-size:20px;opacity:0.7;margin-top:2px;font-weight:500;"></div>
+							<div id="folderCoverReleaseDate" style="font-size:14px;opacity:0;margin-top:2px;letter-spacing:0.3px;min-height:1em;"></div>
+							<div id="folderCoverDuration" style="font-size:14px;opacity:0;margin-top:2px;letter-spacing:0.3px;min-height:1em;"></div>
 						</div>
-						<div id="folderCoverMeta" style="font-size:20px;opacity:0.7;margin-top:2px;font-weight:500;"></div>
-						<div id="folderCoverReleaseDate" style="font-size:14px;opacity:0;margin-top:2px;letter-spacing:0.3px;transition:opacity 0.35s ease;min-height:1em;"></div>
 						<div id="folderCoverActions"
 							style="display:flex;gap:12px;margin-top:10px;flex-wrap:wrap;align-items:center;"></div>
 					</div>
@@ -16972,7 +16995,7 @@ async function loadTrackMetadataFromDB() {
                 const result = request.result || [];
                 let hasOldMetadata = false;
                 for (const item of result) {
-                    if (!item.metadataVersion || item.metadataVersion !== 'metadata-store-v14') {
+                    if (!item.metadataVersion || item.metadataVersion !== 'metadata-store-v15') {
                         hasOldMetadata = true;
                                                 break; // Found at least one old entry, that's enough
                     }
@@ -17082,7 +17105,7 @@ async function saveTrackMetadataToDB(id, data) {
                 id,
                 data,
                 timestamp: Date.now(),
-                metadataVersion: 'metadata-store-v14' // GootV4 Beta metadata store version
+                metadataVersion: 'metadata-store-v15' // GootV4 Beta metadata store version
             });
             transaction.oncomplete = () => resolve(true);
             transaction.onerror = () => reject(transaction.error);
@@ -18125,7 +18148,7 @@ async function saveCompleteTrackMetadata(trackId, metadata) {
         composer: metadata.composer || '',
         comment: metadata.comment || '',
         timestamp: Date.now(),
-        metadataVersion: 'metadata-store-v14'
+        metadataVersion: 'metadata-store-v15'
     };
     _idbWriteQueue.set(trackId, record);
     _scheduleIDBFlush();
@@ -20906,29 +20929,44 @@ async function loadFolders(id, refresh = false) {
                     const relDateEl = document.getElementById('folderCoverReleaseDate');
                     if (relDateEl) {
                         const rd = tracks.map(t => trackMetadata[t.id]?.release_date).find(v => v);
-                        if (rd) { relDateEl.textContent = _formatReleaseDate(rd); requestAnimationFrame(() => { relDateEl.style.opacity = '0.45'; }); }
+                        if (rd) { relDateEl.textContent = _formatReleaseDate(rd); relDateEl.style.opacity = '0.45'; }
                         else { relDateEl.textContent = ''; relDateEl.style.opacity = '0'; }
                     }
+                    const durEl = document.getElementById('folderCoverDuration');
+                    if (durEl) {
+                        const lenText = _computeAlbumLengthText(tracks);
+                        if (lenText) { durEl.textContent = lenText; durEl.style.opacity = '0.45'; }
+                        else { durEl.textContent = ''; durEl.style.opacity = '0'; }
+                    }
                 })();
-                // Fetch release_date for this album — always fetch to keep trackMetadata warm,
-                // but only update the DOM if the date isn't already showing (prevents pop-in)
-                (function fetchReleaseDateForBanner() {
-                    const sampleIds = tracks.slice(0, 5).map(t => t.id);
-                    if (!sampleIds.length) return;
+                // Fetch release_date + durations for this album immediately — always fetch to keep
+                // trackMetadata warm, but only update the DOM if not already showing (prevents pop-in)
+                (function fetchCoverMetaForBanner() {
+                    const allIds = tracks.map(t => t.id).filter(Boolean);
+                    if (!allIds.length) return;
                     fetch(`${PLAYER_WORKER_URL}/metadata/batch`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ ids: sampleIds })
+                        body: JSON.stringify({ ids: allIds })
                     }).then(r => r.ok ? r.json() : null).then(data => {
-                        const rd = (data?.results || []).map(r => r.release_date).find(v => v);
-                        if (!rd) return;
-                        // Always write into trackMetadata so next visit finds it immediately
-                        tracks.forEach(t => { if (trackMetadata[t.id]) trackMetadata[t.id].release_date = rd; });
-                        // Fade in — whether already visible or not, transition handles it gracefully
+                        const results = data?.results || [];
+                        if (!results.length) return;
+                        results.forEach(item => {
+                            if (!item?.id) return;
+                            const existing = trackMetadata[item.id] || {};
+                            if (item.release_date && !existing.release_date) existing.release_date = item.release_date;
+                            if (item.duration && !existing.duration) existing.duration = item.duration;
+                            trackMetadata[item.id] = existing;
+                        });
                         const relDateEl = document.getElementById('folderCoverReleaseDate');
                         if (relDateEl && !relDateEl.textContent.trim()) {
-                            relDateEl.textContent = _formatReleaseDate(rd);
-                            requestAnimationFrame(() => { relDateEl.style.opacity = '0.45'; });
+                            const rd = tracks.map(t => trackMetadata[t.id]?.release_date).find(v => v);
+                            if (rd) { relDateEl.textContent = _formatReleaseDate(rd); relDateEl.style.opacity = '0.45'; }
+                        }
+                        const durEl = document.getElementById('folderCoverDuration');
+                        if (durEl && !durEl.textContent.trim()) {
+                            const lenText = _computeAlbumLengthText(tracks);
+                            if (lenText) { durEl.textContent = lenText; durEl.style.opacity = '0.45'; }
                         }
                     }).catch(() => {});
                 })();
@@ -20946,8 +20984,14 @@ async function loadFolders(id, refresh = false) {
                     const relDateEl2 = document.getElementById('folderCoverReleaseDate');
                     if (relDateEl2) {
                         const rd = tracks.map(t => trackMetadata[t.id]?.release_date).find(v => v);
-                        if (rd) { relDateEl2.textContent = _formatReleaseDate(rd); requestAnimationFrame(() => { relDateEl2.style.opacity = '0.45'; }); }
+                        if (rd) { relDateEl2.textContent = _formatReleaseDate(rd); relDateEl2.style.opacity = '0.45'; }
                         else { relDateEl2.textContent = ''; relDateEl2.style.opacity = '0'; }
+                    }
+                    const durEl2 = document.getElementById('folderCoverDuration');
+                    if (durEl2) {
+                        const lenText = _computeAlbumLengthText(tracks);
+                        if (lenText) { durEl2.textContent = lenText; durEl2.style.opacity = '0.45'; }
+                        else { durEl2.textContent = ''; durEl2.style.opacity = '0'; }
                     }
                     if (!_bgSet) {
                         const firstWithArt = tracks.find(t => {
@@ -20959,7 +21003,7 @@ async function loadFolders(id, refresh = false) {
                             _applyBannerArt(albumArtCache[al], al);
                         }
                     }
-                    if (_bgSet) metadataUpdateListeners.delete(coverMetaListener);
+                    // (listener stays registered until navigation — cleaned up via _registerNavListener)
                 };
                 _registerNavListener(coverMetaListener);
                 if (coverActionsEl) {
@@ -21384,12 +21428,28 @@ function getFolderActionsHTML(playFn, shuffleFn, isAlbum = false) {
     const extraMenuFns = isAlbum
         ? `openAlbumEllipsisMenu`
         : `openFolderEllipsisMenu`;
+    if (isAlbum) {
+        return `
+            <button class="m3-btn m3-btn-text album-cover-action-btn" onclick="${playFn}()" title="Play">
+                <i class="fa-solid fa-play"></i>
+                <span>Play</span>
+            </button>
+            <button class="m3-btn m3-btn-text album-cover-action-btn" onclick="${shuffleFn}()" title="Shuffle Play">
+                <i class="fa-solid fa-shuffle"></i>
+                <span>Shuffle</span>
+            </button>
+            <button class="m3-btn m3-btn-text album-cover-action-btn folder-ellipsis-btn" onclick="${extraMenuFns}(event, this)" title="More options">
+                <i class="fa-solid fa-ellipsis"></i>
+                <span>More</span>
+            </button>
+        `;
+    }
     return `
         <button class="m3-btn m3-btn-filled" onclick="${playFn}()">
             <i class="fa-solid fa-play"></i>
             <span>Play All</span>
         </button>
-        <button class="m3-btn m3-btn-tonal" onclick="${shuffleFn}()">
+        <button class="m3-btn m3-btn-tonal folder-shuffle-btn" onclick="${shuffleFn}()" title="Shuffle Play">
             <i class="fa-solid fa-shuffle"></i>
             <span>Shuffle Play</span>
         </button>
@@ -21649,6 +21709,26 @@ function formatTrackDuration(seconds) {
     const m = Math.floor(s / 60);
     const sec = s % 60;
     return m + ':' + String(sec).padStart(2, '0');
+}
+function formatAlbumDuration(totalSeconds) {
+    if (!totalSeconds || isNaN(totalSeconds) || totalSeconds <= 0) return '';
+    const totalMinutes = Math.round(totalSeconds / 60);
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    if (h > 0) return `${h} hr ${m} min`;
+    return `${m} min`;
+}
+function _computeAlbumLengthText(tracks) {
+    if (!tracks || !tracks.length) return '';
+    const durations = tracks
+        .map(t => Number(trackMetadata[t.id]?.duration ?? t.duration))
+        .filter(d => d && !isNaN(d) && d > 0);
+    if (!durations.length) return '';
+    const totalSeconds = durations.reduce((sum, d) => sum + d, 0);
+    const lenText = formatAlbumDuration(totalSeconds);
+    if (!lenText) return '';
+    const countText = `${tracks.length} song${tracks.length === 1 ? '' : 's'}`;
+    return `${countText}, ${lenText}`;
 }
 /**
  * Duration is now provided by the worker via /metadata/batch. Client-side parsing removed.
@@ -24055,25 +24135,336 @@ function addToQueue_fromShare() {
     }
     closeShareModal();
 }
+/**
+ * Fetches an image (data URL or remote URL) and returns it as an ArrayBuffer + mime type.
+ * Used to embed album art (from track metadata or R2) into downloaded files.
+ */
+async function fetchImageForEmbed(url) {
+    if (!url) return null;
+    try {
+        const res = await fetch(url);
+        if (!res.ok) return null;
+        const buf = await res.arrayBuffer();
+        if (!buf || buf.byteLength === 0) return null;
+        let type = res.headers.get('content-type') || '';
+        if (!type || type.includes('octet-stream')) {
+            const m = url.match(/^data:([^;]+);/);
+            type = m ? m[1] : 'image/jpeg';
+        }
+        return { buffer: buf, type };
+    } catch (e) {
+        return null;
+    }
+}
+/**
+ * Resolves the best available album art for a track's metadata for embedding:
+ * prefers the track's own albumArt (edited cover), then falls back to the
+ * album-level art stored in R2 (e.g. set via Folder Maps / album redirects).
+ */
+async function getAlbumArtForEmbed(meta) {
+    if (!meta) return null;
+    if (meta.albumArt) {
+        const fromMeta = await fetchImageForEmbed(meta.albumArt);
+        if (fromMeta) return fromMeta;
+    }
+    if (meta.album && meta.album !== 'Unknown') {
+        const cached = AlbumArtManager.cache[meta.album] || albumArtCache[meta.album];
+        if (cached) {
+            const fromCache = await fetchImageForEmbed(cached);
+            if (fromCache) return fromCache;
+        }
+        try {
+            const r2Url = R2AlbumArt.getR2Url(meta.album, meta.artist || '');
+            const fromR2 = await fetchImageForEmbed(r2Url);
+            if (fromR2) return fromR2;
+        } catch (e) {}
+    }
+    return null;
+}
+/**
+ * Checks whether a track has a server-side audio redirect (set via the
+ * /redirect endpoint). Returns the redirect target file ID, or null if
+ * the track has no redirect.
+ */
+async function checkTrackRedirect(trackId) {
+    try {
+        const res = await fetch(`${STREAMING_URL}/redirect?from=${encodeURIComponent(trackId)}`);
+        if (!res.ok) return null;
+        const data = await res.json();
+        return (data && data.to) ? data.to : null;
+    } catch (e) {
+        return null;
+    }
+}
+/**
+ * Embeds the current (D1/R2-backed, possibly user-edited) title/artist/album/art
+ * metadata into an MP3's ID3 tags, while preserving other existing frames
+ * (comments, lyrics, disc/track numbers, genre, year, composer, date) and
+ * writing album artist (TPE2). Returns the (possibly new) ArrayBuffer.
+ * Falls back to the original buffer if anything goes wrong or ID3Writer is unavailable.
+ *
+ * @param {ArrayBuffer} audioArrayBuffer - the actual audio bytes to tag (may come from a redirect target)
+ * @param {object} meta - title/artist/album/albumArt from D1/R2 for the ORIGINAL track id
+ * @param {object} [opts]
+ * @param {ArrayBuffer} [opts.tagSourceBuffer] - bytes to read preserved frames from (the ORIGINAL file, if different from audioArrayBuffer)
+ * @param {number} [opts.overrideTrackNumber] - track number to write; always wins over any embedded TRCK
+ */
+async function embedId3Metadata(audioArrayBuffer, meta, opts = {}) {
+    if (typeof ID3Writer === 'undefined' || !meta) return audioArrayBuffer;
+    const { tagSourceBuffer, overrideTrackNumber } = opts;
+    const sourceBuffer = tagSourceBuffer || audioArrayBuffer;
+    try {
+        // Read existing tags from the source (original) file so frames ID3Writer would otherwise strip can be carried over
+        const existingTags = await new Promise((resolve) => {
+            jsmediatags.read(new Blob([sourceBuffer]), {
+                onSuccess: (tag) => resolve((tag && tag.tags) || {}),
+                onError: () => resolve({})
+            });
+        });
+        const writer = new ID3Writer(audioArrayBuffer);
+        // --- Preserve existing frames not being overwritten ---
+        // Parse all COMM frames directly from the raw ID3 bytes — jsmediatags only exposes one.
+        (() => {
+            try {
+                const src = new Uint8Array(sourceBuffer);
+                // Locate ID3v2 header
+                if (src[0] !== 0x49 || src[1] !== 0x44 || src[2] !== 0x33) return; // no ID3
+                const id3Ver = src[3]; // major version (3 or 4)
+                const flagsByte = src[5];
+                const hasExtHeader = !!(flagsByte & 0x40);
+                const id3Size = ((src[6] & 0x7f) << 21) | ((src[7] & 0x7f) << 14) | ((src[8] & 0x7f) << 7) | (src[9] & 0x7f);
+                let pos = 10;
+                if (hasExtHeader) {
+                    const extSize = (src[10] << 24) | (src[11] << 16) | (src[12] << 8) | src[13];
+                    pos += (id3Ver === 4 ? extSize : extSize + 4);
+                }
+                const end = 10 + id3Size;
+                const dec = new TextDecoder('utf-8', { fatal: false });
+                const readFrameSize = (p) => id3Ver === 4
+                    ? ((src[p] & 0x7f) << 21) | ((src[p+1] & 0x7f) << 14) | ((src[p+2] & 0x7f) << 7) | (src[p+3] & 0x7f)
+                    : (src[p] << 24) | (src[p+1] << 16) | (src[p+2] << 8) | src[p+3];
+                while (pos + 10 < end) {
+                    const frameId = String.fromCharCode(src[pos], src[pos+1], src[pos+2], src[pos+3]);
+                    const frameSize = readFrameSize(pos + 4);
+                    if (frameSize <= 0 || pos + 10 + frameSize > end) break;
+                    if (frameId === 'COMM') {
+                        const fData = src.slice(pos + 10, pos + 10 + frameSize);
+                        const enc = fData[0]; // 0=latin1, 1=utf16, 2=utf16be, 3=utf8
+                        const lang = String.fromCharCode(fData[1], fData[2], fData[3]).replace(/\x00/g, '');
+                        const safeLang = /^[a-zA-Z]{3}$/.test(lang) ? lang.toLowerCase() : 'eng';
+                        // Find end of short description (null-terminated, 2 bytes for utf16)
+                        let descEnd = 4;
+                        if (enc === 1 || enc === 2) {
+                            while (descEnd + 1 < fData.length && (fData[descEnd] !== 0 || fData[descEnd+1] !== 0)) descEnd += 2;
+                            descEnd += 2;
+                        } else {
+                            while (descEnd < fData.length && fData[descEnd] !== 0) descEnd++;
+                            descEnd++;
+                        }
+                        const descBytes = fData.slice(4, descEnd - (enc === 1 || enc === 2 ? 2 : 1));
+                        const textBytes = fData.slice(descEnd);
+                        let description = '', text = '';
+                        if (enc === 1 || enc === 2) {
+                            description = new TextDecoder(enc === 2 ? 'utf-16be' : 'utf-16le', { fatal: false }).decode(descBytes);
+                            text = new TextDecoder(enc === 2 ? 'utf-16be' : 'utf-16le', { fatal: false }).decode(textBytes);
+                        } else {
+                            description = dec.decode(descBytes);
+                            text = dec.decode(textBytes);
+                        }
+                        if (text) writer.setFrame('COMM', { description, text, language: safeLang });
+                    }
+                    pos += 10 + frameSize;
+                }
+            } catch (e) { /* fall through */ }
+        })();
+        if (existingTags.lyrics) {
+            // jsmediatags returns USLT as an object {description, lyrics, language}, not a plain string
+            const lyricsText = (typeof existingTags.lyrics === 'object')
+                ? (existingTags.lyrics.lyrics || '')
+                : existingTags.lyrics;
+            if (lyricsText) {
+                writer.setFrame('USLT', {
+                    description: existingTags.lyrics.description || '',
+                    lyrics: lyricsText,
+                    language: (/^[a-zA-Z]{3}$/.test((existingTags.lyrics && existingTags.lyrics.language) || '') ? existingTags.lyrics.language.toLowerCase() : 'eng')
+                });
+            }
+        }
+        // overrideTrackNumber always wins — it comes from Drive filenames which are authoritative
+        if (overrideTrackNumber) {
+            writer.setFrame('TRCK', String(overrideTrackNumber));
+        } else if (existingTags.track) {
+            writer.setFrame('TRCK', String(existingTags.track));
+        }
+        if (existingTags.partOfSet) writer.setFrame('TPOS', String(existingTags.partOfSet));
+        if (existingTags.genre) writer.setFrame('TCON', [existingTags.genre]);
+        if (meta && meta.year) {
+            const yearNum = parseInt(String(meta.year).slice(0, 4), 10);
+            if (!isNaN(yearNum) && yearNum > 0) writer.setFrame('TYER', yearNum);
+        }
+        if (existingTags.composer) writer.setFrame('TCOM', [existingTags.composer]);
+        // Preserve raw release-date frame (ID3v2.3 TDAT, format 'DDMM') if present
+        const rawTDAT = (existingTags.TDAT && existingTags.TDAT.data) || existingTags.TDAT;
+        if (rawTDAT) writer.setFrame('TDAT', String(rawTDAT));
+        // --- Album artist (TPE2): keep the file's existing album artist if set, else fall back to the track artist ---
+        const rawTPE2 = (existingTags.TPE2 && existingTags.TPE2.data) || existingTags.TPE2;
+        const albumArtist = rawTPE2 || meta.albumArtist || meta.artist;
+        if (albumArtist) writer.setFrame('TPE2', albumArtist);
+        // --- Overwrite with current title / artist / album / album art ---
+        if (meta.title) writer.setFrame('TIT2', meta.title);
+        if (meta.artist) writer.setFrame('TPE1', [meta.artist]);
+        if (meta.album && meta.album !== 'Unknown') writer.setFrame('TALB', meta.album);
+        const art = await getAlbumArtForEmbed(meta);
+        if (art) {
+            writer.setFrame('APIC', {
+                type: 3,
+                data: art.buffer,
+                description: ''
+            });
+        }
+        writer.addTag();
+        return writer.arrayBuffer;
+    } catch (e) {
+        console.error('[ID3] Failed to embed metadata, returning untagged audio:', e);
+        return audioArrayBuffer;
+    }
+}
+/**
+ * Determines whether a file should get ID3 tags embedded (MP3 only).
+ */
+function isMp3Format(mimeType, fileName) {
+    const mime = (mimeType || '').toLowerCase();
+    if (mime.includes('mpeg') || mime.includes('mp3')) return true;
+    const ext = (fileName || '').split('.').pop().toLowerCase();
+    return ext === 'mp3';
+}
+/**
+ * Fetches a track's playable audio bytes (resolving any server-side redirect)
+ * plus, separately, the ORIGINAL (non-redirected) file's bytes when a redirect
+ * exists, so existing tags (comments, lyrics, track/disc numbers, genre, year,
+ * composer, date, album artist) can be preserved from the file that's actually
+ * in the folder while the audio itself comes from the redirect target.
+ * Applies the current D1/R2 metadata (title/artist/album/art) on top.
+ *
+ * @param {string} trackId
+ * @param {object} meta - from getCentralTrackMetadata(trackId)
+ * @param {object} [opts]
+ * @param {string} [opts.mimeHint] - track.mimeType, passed through to the streaming URL
+ * @param {string} [opts.fileName] - original Drive filename, used for track-number fallback
+ * @returns {Promise<{arrayBuffer: ArrayBuffer, mimeType: string, trackNumber: number|null}|null>}
+ */
+async function prepareTrackAudio(trackId, meta, opts = {}) {
+    const { mimeHint = '', fileName = '' } = opts;
+    const mimeParam = mimeHint ? `&mime=${encodeURIComponent(mimeHint)}` : '';
+    const audioRes = await fetch(`${STREAMING_URL}?id=${trackId}${mimeParam}`);
+    if (!audioRes.ok) return null;
+    let audioBuffer = await audioRes.arrayBuffer();
+    const mimeType = audioRes.headers.get('content-type') || mimeHint || '';
+    // If this track has a redirect, fetch the ORIGINAL (non-redirected) file too,
+    // so its tags (comments, lyrics, track number, etc.) can be preserved.
+    let tagSourceBuffer = null;
+    let redirectTargetId = null;
+    const redirectTarget = await checkTrackRedirect(trackId);
+    if (redirectTarget) {
+        redirectTargetId = redirectTarget;
+        try {
+            const origRes = await fetch(`${STREAMING_URL}?id=${trackId}&raw=1${mimeParam}`);
+            if (origRes.ok) tagSourceBuffer = await origRes.arrayBuffer();
+        } catch (e) {}
+    }
+    const tagSource = tagSourceBuffer || audioBuffer;
+    // Determine track number.
+    // Priority for redirect tracks: (1) redirect target's Drive filename, (2) original folder filename.
+    // Priority for non-redirect tracks: (1) TRCK tag in the file, (2) original folder filename.
+    // We deliberately do NOT use the TRCK tag from the original file when a redirect exists —
+    // that tag reflects the original album's track order, not the redirect target's position.
+    let trackNumber = null;
+    const tryFilenameTrackNum = (name) => {
+        if (!name) return false;
+        const m = name.match(/^(\d{1,3})[\s._\-]/);
+        if (m) { const n = parseInt(m[1], 10); if (!isNaN(n) && n > 0) { trackNumber = n; return true; } }
+        return false;
+    };
+    if (redirectTargetId) {
+        // Redirect track: Drive filename of the target is authoritative for track number
+        let gotFromRedirect = false;
+        try {
+            const nameRes = await fetch(`${METADATA_API_URL}/metadata/filename?id=${encodeURIComponent(redirectTargetId)}`);
+            if (nameRes.ok) { const { name: rdName } = await nameRes.json(); gotFromRedirect = tryFilenameTrackNum(rdName); }
+        } catch (e) {}
+        if (!gotFromRedirect) tryFilenameTrackNum(fileName);
+    } else {
+        // Non-redirect track: read TRCK from the file's own tags, fall back to folder filename
+        try {
+            const trackTag = await new Promise((resolve) => {
+                jsmediatags.read(new Blob([tagSource]), {
+                    onSuccess: (tag) => resolve((tag.tags && tag.tags.track) || null),
+                    onError: () => resolve(null)
+                });
+            });
+            if (trackTag) {
+                const n = parseInt(String(trackTag).split('/')[0], 10);
+                if (!isNaN(n) && n > 0) trackNumber = n;
+            }
+        } catch (e) {}
+        if (trackNumber === null) tryFilenameTrackNum(fileName);
+    }
+    if (isMp3Format(mimeType, fileName)) {
+        audioBuffer = await embedId3Metadata(audioBuffer, meta, {
+            tagSourceBuffer: tagSource,
+            overrideTrackNumber: trackNumber
+        });
+    }
+    return { arrayBuffer: audioBuffer, mimeType, trackNumber };
+}
+/**
+ * Fetches a track's audio bytes and applies its current D1/R2-backed metadata
+ * (edited titles, artists, album, and album art / folder-map redirects) as
+ * ID3 tags before download. Returns null on fetch failure.
+ */
+async function buildTaggedDownload(track) {
+    const meta = await getCentralTrackMetadata(track.id);
+    const result = await prepareTrackAudio(track.id, meta, { mimeHint: track.mimeType, fileName: track.name });
+    if (!result) return null;
+    const origExt = (track.name.match(/\.([^.]+)$/) || [, 'mp3'])[1];
+    const ext = isMp3Format(result.mimeType, track.name) ? 'mp3' : origExt;
+    const trackNumPrefix = (result.trackNumber !== null) ? String(result.trackNumber).padStart(2, '0') + '. ' : '';
+    const baseTitle = (meta.title && meta.title !== 'Unknown Track') ? meta.title : track.name.replace(/\.[^/.]+$/, '');
+    const artist = (meta.artist && meta.artist !== 'Unknown Artist') ? meta.artist : '';
+    const fileName = trackNumPrefix + (artist ? `${artist} - ${baseTitle}` : baseTitle).replace(/[<>:"/\\|?*]/g, '_') + '.' + ext;
+    return { arrayBuffer: result.arrayBuffer, fileName, mimeType: result.mimeType };
+}
 async function downloadSharedTrack() {
     if (!currentShareTrackId) {
         showShareToast('No track ID found', 'error');
         return;
     }
     try {
-        const meta = trackMetadata[currentShareTrackId];
-        const queueTrack = queue.find(t => t.id === currentShareTrackId);
-        const title = meta?.title || queueTrack?.title || 'Unknown Track';
-        const artist = meta?.artist || queueTrack?.artist || 'Unknown Artist';
+        const meta = await getCentralTrackMetadata(currentShareTrackId);
+        const title = meta.title || 'Unknown Track';
+        const artist = meta.artist || 'Unknown Artist';
         showShareToast('Starting download...');
-        const url = `${STREAMING_URL}?id=${currentShareTrackId}`;
+        const result = await prepareTrackAudio(currentShareTrackId, meta);
+        if (!result) {
+            throw new Error('Failed to fetch track');
+        }
+        let ext = 'mp3';
+        if (!isMp3Format(result.mimeType, '')) {
+            if (result.mimeType.includes('flac')) ext = 'flac';
+            else if (result.mimeType.includes('wav')) ext = 'wav';
+            else if (result.mimeType.includes('mp4') || result.mimeType.includes('m4a')) ext = 'm4a';
+            else if (result.mimeType.includes('ogg')) ext = 'ogg';
+        }
+        const blob = new Blob([result.arrayBuffer], { type: result.mimeType || 'audio/mpeg' });
+        const blobUrl = URL.createObjectURL(blob);
         const link = document.createElement('a');
-        link.href = url;
-        link.download = `${artist} - ${title}.mp3`;
-        link.target = '_blank';
+        link.href = blobUrl;
+        link.download = `${artist} - ${title}.${ext}`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+        showShareToast('Download started!', 'success');
         closeShareModal();
     } catch (err) {
         showShareToast('Failed to download track', 'error');
@@ -24095,16 +24486,22 @@ async function downloadCurrentFolder() {
         }
         if (tracks.length === 1) {
             const track = tracks[0];
-            const fileName = track.name.replace(/[<>:"/\\|?*]/g, '_');
             showShareToast('Downloading track...');
+            const result = await buildTaggedDownload(track);
+            if (!result) {
+                showShareToast('Failed to download track', 'error');
+                return;
+            }
+            const blob = new Blob([result.arrayBuffer], { type: result.mimeType || track.mimeType || 'audio/mpeg' });
+            const blobUrl = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = `${STREAMING_URL}?id=${track.id}&mime=${encodeURIComponent(track.mimeType)}`;
-            a.download = fileName;
-            a.style.display = 'none';
+            a.href = blobUrl;
+            a.download = result.fileName;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-            showShareToast(`Downloading "${fileName}"...`, 'success');
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+            showShareToast(`Downloaded "${result.fileName}"!`, 'success');
             return;
         }
         showShareToast(`Creating zip with ${tracks.length} tracks...`);
@@ -24112,16 +24509,13 @@ async function downloadCurrentFolder() {
         let completed = 0;
         for (const track of tracks) {
             try {
-                const url = `${STREAMING_URL}?id=${track.id}&mime=${encodeURIComponent(track.mimeType)}`;
-                const response = await fetch(url);
-                if (!response.ok) {
+                const result = await buildTaggedDownload(track);
+                if (!result) {
                     continue;
                 }
-                const blob = await response.blob();
-                const fileName = track.name.replace(/[<>:"/\\|?*]/g, '_');
-                zip.file(fileName, blob);
+                zip.file(result.fileName, result.arrayBuffer);
                 completed++;
-                showShareToast(`Adding to zip... (${completed}/${tracks.length}")`);
+                showShareToast(`Adding to zip... (${completed}/${tracks.length})`);
             } catch (err) {
             }
         }
@@ -34426,7 +34820,7 @@ async function importAllData(input) {
                         clearRequest.onsuccess = () => resolve();
                     });
                     for (const item of importData.indexedDB.trackMetadata) {
-                        item.metadataVersion = 'metadata-store-v14';
+                        item.metadataVersion = 'metadata-store-v15';
                         store.put(item);
                     }
                     await new Promise((resolve) => {
@@ -45412,6 +45806,8 @@ function _removeMetaEditFromCurrentView() {
     const metaEl = document.getElementById('folderCoverMeta');
     if (titleEl && titleEl.dataset.origText) { titleEl.textContent = titleEl.dataset.origText; delete titleEl.dataset.origText; }
     if (metaEl && metaEl.dataset.origText) { metaEl.textContent = metaEl.dataset.origText; delete metaEl.dataset.origText; }
+    if (titleEl) { titleEl._metaEditable = false; titleEl.style.cursor = ''; titleEl.title = ''; }
+    if (metaEl) { metaEl._metaEditable = false; metaEl.style.cursor = ''; metaEl.title = ''; }
     // Remove release date row if exists
     const rdRow = document.getElementById('_metaEditReleaseDateRow');
     if (rdRow) rdRow.remove();
@@ -45494,12 +45890,32 @@ function _applyMetaEditToAlbumBanner() {
     metaEl.dataset.origText = artist;
 
     _makeEditable(titleEl, async (val) => {
-        await _saveAlbumMeta(album, artist, { album: val });
+        const prevAlbum = titleEl.dataset.origText || album;
+        const curArtist = metaEl.dataset.origText || artist;
+        await _saveAlbumMeta(prevAlbum, curArtist, { album: val });
         titleEl.dataset.origText = val;
+        if (currentAlbumView) currentAlbumView.album.album = val;
+        // Refresh visible track rows to reflect the new album name
+        document.querySelectorAll('.song-row[data-track-id]').forEach(row => {
+            const tid = row.dataset.trackId;
+            if (trackMetadata[tid]) trackMetadata[tid].album = val;
+            const albumEl = row.querySelector('.meta-album');
+            if (albumEl) albumEl.textContent = val;
+            row.dataset.album = val;
+        });
     });
     _makeEditable(metaEl, async (val) => {
-        await _saveAlbumMeta(album, artist, { artist: val });
+        const curAlbum = titleEl.dataset.origText || album;
+        const prevArtist = metaEl.dataset.origText || artist;
+        await _saveAlbumMeta(curAlbum, prevArtist, { artist: val });
         metaEl.dataset.origText = val;
+        if (currentAlbumView) currentAlbumView.album.artist = val;
+        document.querySelectorAll('.song-row[data-track-id]').forEach(row => {
+            const tid = row.dataset.trackId;
+            if (trackMetadata[tid]) trackMetadata[tid].artist = val;
+            const artistEl = row.querySelector('.meta-artist');
+            if (artistEl) artistEl.textContent = val;
+        });
     });
 
     // Add release date row if not already there
