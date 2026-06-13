@@ -18739,26 +18739,7 @@ async function initAudioContext() {
     if (audioCtx) return audioCtx;
     try {
         const AudioContext = window.AudioContext || window.webkitAudioContext;
-        const _ua = navigator.userAgent;
-        const _isFirefox = /Firefox\//.test(_ua);
-        const _isAndroid = /Android/.test(_ua);
-        let _audioCtxOptions;
-        if (_isFirefox) {
-            _audioCtxOptions = {};
-        } else if (_isAndroid) {
-            _audioCtxOptions = { latencyHint: 'interactive' };
-        } else {
-            const _nativeSR = (function() {
-                try {
-                    const _probe = new AudioContext();
-                    const sr = _probe.sampleRate;
-                    _probe.close();
-                    return sr;
-                } catch(e) { return 48000; }
-            })();
-            _audioCtxOptions = { sampleRate: _nativeSR, latencyHint: 'playback' };
-        }
-        audioCtx = new AudioContext(_audioCtxOptions);
+        audioCtx = new AudioContext();
         audioContext = audioCtx; // Sync for normalization code
         if (audioCtx.state === 'suspended') {
             audioCtx.resume();
@@ -45645,6 +45626,7 @@ async function navigateToRealAlbumFolder(albumName, artistName, trackId) {
         if (!ctx || ctx._iosBgHooked) return;
         ctx._iosBgHooked = true;
         ctx.onstatechange = function() {
+            if (!document.hidden) return; // Only intervene for background audio — foreground state changes (e.g. thermal-throttle suspends) shouldn't trigger graph rewiring
             if (ctx.state === 'suspended') {
                 // Lock pitch immediately so native fallback doesn't shift it
                 _setPitchLock(true);
