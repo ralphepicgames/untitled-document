@@ -15977,6 +15977,7 @@ function refreshAllUIForTrack(trackId) {
             if (fsArt) setAlbumArtWithFade(fsArt, meta.albumArt);
             if (deArt) setAlbumArtWithFade(deArt, meta.albumArt);
             if (deArtImg) {
+                if (meta.albumArt && meta.albumArt.startsWith('http')) deArtImg.crossOrigin = 'anonymous';
                 deArtImg.src = meta.albumArt;
                 deArtImg.classList.add('visible');
             }
@@ -22911,12 +22912,12 @@ function setAlbumArtWithFade(container, artData, fallbackUrl = null) {
     if (artData.startsWith('data:')) {
         img.src = artData;
     } else if (artData.startsWith('http')) {
-        img.src = artData;
         if (isYTThumb) {
             img.referrerPolicy = 'no-referrer';
         } else {
             img.crossOrigin = 'anonymous'; // Required for R2 images
         }
+        img.src = artData;
     } else {
         img.src = artData;
     }
@@ -25755,6 +25756,7 @@ function updateNowPlayingArt(artBase64) {
     if (fsArt) setAlbumArtWithFade(fsArt, artBase64);
     if (deArt) setAlbumArtWithFade(deArt, artBase64);
     if (deArtImg) {
+        if (artBase64 && artBase64.startsWith('http')) deArtImg.crossOrigin = 'anonymous';
         deArtImg.src = artBase64;
         deArtImg.style.opacity = '0';
         deArtImg.style.transition = 'opacity 0.4s ease';
@@ -26199,6 +26201,7 @@ function updateQueueAndNowPlayingWithMetadata(trackId) {
         }
         const deArtImg = document.getElementById("desktopExtendedArtImg");
         if (deArtImg) {
+            if (artSrc && artSrc.startsWith('http')) deArtImg.crossOrigin = 'anonymous';
             deArtImg.src = artSrc;
             deArtImg.classList.add('visible');
         }
@@ -30115,14 +30118,17 @@ function toggleAnimations() {
         _plasmaSpeed += (targetSpeed - _plasmaSpeed) * 0.04; // very slow lerp
         _plasmaT += 0.004 * _plasmaSpeed;
         const t = _plasmaT;
-        let pal = _dePalette && _dePalette.length >= 2 ? _dePalette : null;
-        if (pal) {
-            const isGrey = pal.every(([r, g, b]) => {
-                const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
-                return (mx - mn) < 48; // within 18% of 255
-            });
-            if (isGrey) pal = null; // force vivid fallback
-        }
+        let pal = (_dePalette && _dePalette.length >= 2 && !_dePaletteIsAccentFallback) ? _dePalette
+                : (_dePalette && _dePalette.length === 1 && !_dePaletteIsAccentFallback) ? (() => {
+                    const [r, g, b] = _dePalette[0];
+                    const lighten = (v, f) => Math.max(0, Math.min(255, Math.round(v + (255 - v) * f)));
+                    const darken  = (v, f) => Math.max(0, Math.min(255, Math.round(v * (1 - f))));
+                    return [
+                        [lighten(r, 0.35), lighten(g, 0.35), lighten(b, 0.35)],
+                        [r, g, b],
+                        [darken(r, 0.35), darken(g, 0.35), darken(b, 0.35)]
+                    ];
+                })() : null;
         if (!pal) {
             const h1 = (t * 18) % 360;
             const h2 = (h1 + 140) % 360;
@@ -30674,11 +30680,17 @@ function toggleAnimations() {
         _pbPlasmaSpeed += (targetSpeed - _pbPlasmaSpeed) * 0.04;
         _pbPlasmaT += 0.004 * _pbPlasmaSpeed;
         const t = _pbPlasmaT;
-        let pal = (_dePalette && _dePalette.length >= 2) ? _dePalette : null;
-        if (pal) {
-            const isGrey = pal.every(([r, g, b]) => (Math.max(r,g,b) - Math.min(r,g,b)) < 48);
-            if (isGrey) pal = null;
-        }
+        let pal = (_dePalette && _dePalette.length >= 2 && !_dePaletteIsAccentFallback) ? _dePalette
+                : (_dePalette && _dePalette.length === 1 && !_dePaletteIsAccentFallback) ? (() => {
+                    const [r, g, b] = _dePalette[0];
+                    const lighten = (v, f) => Math.max(0, Math.min(255, Math.round(v + (255 - v) * f)));
+                    const darken  = (v, f) => Math.max(0, Math.min(255, Math.round(v * (1 - f))));
+                    return [
+                        [lighten(r, 0.35), lighten(g, 0.35), lighten(b, 0.35)],
+                        [r, g, b],
+                        [darken(r, 0.35), darken(g, 0.35), darken(b, 0.35)]
+                    ];
+                })() : null;
         if (!pal) {
             const h1 = (t * 18) % 360, h2 = (h1 + 140) % 360, h3 = (h1 + 260) % 360;
             function hsl2rgb(h, s, l) {
@@ -31379,10 +31391,12 @@ function findVizPalette(img, maxColors = 4) {
             weight: 0, sinSum: 0, cosSum: 0, satSum: 0, lightSum: 0
         }));
         let totalPixels = 0, coloredPixels = 0;
+        let sumR = 0, sumG = 0, sumB = 0;
         for (let i = 0; i < data.length; i += 4) {
             const r = data[i], g = data[i+1], b = data[i+2], a = data[i+3];
             if (a < 128) continue;
             totalPixels++;
+            sumR += r; sumG += g; sumB += b;
             const max = Math.max(r, g, b), min = Math.min(r, g, b);
             const delta = max - min;
             const l = (max + min) / 510;
@@ -31407,7 +31421,15 @@ function findVizPalette(img, maxColors = 4) {
         const totalWeight = buckets.reduce((s, b) => s + b.weight, 0);
         const colorRatio = totalPixels > 0 ? coloredPixels / totalPixels : 0;
         if (totalWeight < 2 || colorRatio < 0.06) {
-            return [[210, 210, 215], [160, 160, 168], [110, 110, 120]];
+            const avgR = totalPixels > 0 ? sumR / totalPixels : 200;
+            const avgG = totalPixels > 0 ? sumG / totalPixels : 200;
+            const avgB = totalPixels > 0 ? sumB / totalPixels : 205;
+            const tint = (factor, lift) => [
+                Math.max(0, Math.min(255, Math.round(avgR * factor + lift))),
+                Math.max(0, Math.min(255, Math.round(avgG * factor + lift))),
+                Math.max(0, Math.min(255, Math.round(avgB * factor + lift)))
+            ];
+            return [tint(1.05, 25), tint(0.85, 0), tint(0.55, -10)];
         }
         const smoothed = buckets.map((bkt, i) => {
             const p1 = buckets[(i - 1 + NUM_BUCKETS) % NUM_BUCKETS];
@@ -31421,12 +31443,19 @@ function findVizPalette(img, maxColors = 4) {
             if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
             return p;
         };
+        // Scale the saturation/lightness floor by how colorful the image actually is —
+        // vivid covers (high colorRatio) keep a strong floor for punchy colors, while
+        // muted/low-saturation covers (colorRatio near the 0.06 cutoff) get little to no
+        // artificial boost so extracted tones stay close to the source (e.g. cream/sepia).
+        const colorFactor = Math.max(0, Math.min(1, (colorRatio - 0.06) / 0.34)); // 0 at 0.06, 1 at >=0.40
+        const satFloor  = 0.18 + colorFactor * 0.32;  // 0.18 .. 0.50
+        const liteFloor = 0.40 + colorFactor * 0.08;  // 0.40 .. 0.48
         const bucketToRgb = (bi) => {
             const bkt = buckets[bi];
             if (bkt.weight === 0) return null;
             const exactHue = ((Math.atan2(bkt.sinSum / bkt.weight, bkt.cosSum / bkt.weight) / (2 * Math.PI)) + 1) % 1;
-            const sat  = Math.min(0.85, Math.max(bkt.satSum / bkt.weight, 0.5));
-            const lite = Math.min(0.65, Math.max(bkt.lightSum / bkt.weight, 0.48));
+            const sat  = Math.min(0.85, Math.max(bkt.satSum / bkt.weight, satFloor));
+            const lite = Math.min(0.65, Math.max(bkt.lightSum / bkt.weight, liteFloor));
             const q = lite < 0.5 ? lite * (1 + sat) : lite + sat - lite * sat;
             const p = 2 * lite - q;
             return [
