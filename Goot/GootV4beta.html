@@ -3915,6 +3915,45 @@
 			vertical-align: middle;
 			opacity: 0.85;
 		}
+		.lossless-badge {
+			display: inline-flex;
+			align-items: center;
+			gap: 3px;
+			background: linear-gradient(135deg, #d4af37, #f4d976);
+			color: #2a2105;
+			font-size: 9px;
+			font-weight: 700;
+			letter-spacing: 0.5px;
+			text-transform: uppercase;
+			padding: 1px 6px;
+			border-radius: 999px;
+			margin-left: 6px;
+			vertical-align: middle;
+			opacity: 0.92;
+			white-space: nowrap;
+		}
+		.lossless-badge i { font-size: 8px; }
+		.lossless-badge.lossless-badge-lg {
+			font-size: 12px;
+			padding: 3px 10px;
+			gap: 5px;
+			border-radius: 999px;
+		}
+		.lossless-badge.lossless-badge-lg i { font-size: 10px; }
+		.song-row-lossless-badge {
+			display: inline-block;
+			background: linear-gradient(135deg, #d4af37, #f4d976);
+			color: #2a2105;
+			font-size: 9px;
+			font-weight: 700;
+			letter-spacing: 0.5px;
+			text-transform: uppercase;
+			padding: 1px 5px;
+			border-radius: 999px;
+			margin-left: 6px;
+			vertical-align: middle;
+			opacity: 0.85;
+		}
 		.single-duration {
 			font-size: 11px;
 			font-weight: 600;
@@ -12806,6 +12845,7 @@
 				html body .player-bar #npAlbum,
 				html body .player-bar #mobileProgScrub { display: none !important; }
 				html body .player-bar .pb-rate-count { display: none !important; }
+				html body .player-bar #npLosslessBadge { display: none !important; }
 				/* Show these */
 				html body .player-bar #btnSkipBack,
 				html body .player-bar #pbLikeBtn,
@@ -13310,7 +13350,10 @@
 							</div>
 							<div id="folderCoverMeta" style="font-size:20px;opacity:0.7;margin-top:2px;font-weight:500;"></div>
 							<div id="folderCoverReleaseDate" style="font-size:14px;opacity:0;margin-top:2px;letter-spacing:0.3px;min-height:1em;"></div>
-							<div id="folderCoverDuration" style="font-size:14px;opacity:0;margin-top:2px;letter-spacing:0.3px;min-height:1em;"></div>
+							<div style="display:flex;align-items:center;gap:10px;">
+								<div id="folderCoverDuration" style="font-size:14px;opacity:0;margin-top:2px;letter-spacing:0.3px;min-height:1em;"></div>
+								<div id="folderCoverLossless" style="display:none;"><span class="lossless-badge lossless-badge-lg"><i class="fa-solid fa-gem"></i><span id="folderCoverLosslessText">Lossless</span></span></div>
+							</div>
 						</div>
 						<div id="folderCoverActions"
 							style="display:flex;gap:12px;margin-top:10px;flex-wrap:wrap;align-items:center;"></div>
@@ -13893,11 +13936,27 @@
 								</div>
 								<i class="fa-solid fa-chevron-right settings-nav-arrow"></i>
 							</button>
+							<button class="settings-nav-row" id="settings-nav-album-redirect" onclick="openSettingsSection('album-redirect')" style="display:none;">
+								<div class="settings-nav-icon"><i class="fa-solid fa-layer-group"></i></div>
+								<div class="settings-nav-text">
+									<div class="settings-nav-title">Album Batch Redirect</div>
+									<div class="settings-nav-sub">Redirect every track on an album at once</div>
+								</div>
+								<i class="fa-solid fa-chevron-right settings-nav-arrow"></i>
+							</button>
 							<button class="settings-nav-row" id="settings-nav-art-redirect" onclick="openSettingsSection('art-redirect')" style="display:none;">
 								<div class="settings-nav-icon"><i class="fa-solid fa-image"></i></div>
 								<div class="settings-nav-text">
 									<div class="settings-nav-title">Album Art Redirects</div>
 									<div class="settings-nav-sub">Replace album art with a new upload</div>
+								</div>
+								<i class="fa-solid fa-chevron-right settings-nav-arrow"></i>
+							</button>
+							<button class="settings-nav-row" id="settings-nav-lossless" onclick="openSettingsSection('lossless')" style="display:none;">
+								<div class="settings-nav-icon"><i class="fa-solid fa-gem"></i></div>
+								<div class="settings-nav-text">
+									<div class="settings-nav-title">Album Lossless Versions</div>
+									<div class="settings-nav-sub">Add lossless Drive IDs for every track on an album at once</div>
 								</div>
 								<i class="fa-solid fa-chevron-right settings-nav-arrow"></i>
 							</button>
@@ -14140,6 +14199,13 @@
 						<div class="m3-card" id="settings-panel-audio" style="display:none;">
 						<label class="m3-setting-row" style="cursor:pointer;">
 							<div class="m3-setting-info">
+								<span class="m3-setting-label">Prefer Lossless Streaming</span>
+								<span class="m3-setting-desc">Use lossless versions of tracks/albums when available</span>
+							</div>
+							<div class="m3-toggle"><input type="checkbox" id="losslessToggle" onchange="toggleLosslessPreference()"><span class="m3-toggle-track"><span class="m3-toggle-thumb"></span></span></div>
+						</label>
+						<label class="m3-setting-row" style="cursor:pointer;">
+							<div class="m3-setting-info">
 								<span class="m3-setting-label">Volume Normalization</span>
 								<span class="m3-setting-desc">Consistent volume across all tracks</span>
 							</div>
@@ -14294,6 +14360,62 @@
 								<div id="redirect-existing-banner" style="display:none;font-size:12px;opacity:0.55;padding:6px 10px;background:color-mix(in srgb,var(--md-sys-color-primary) 8%,transparent);border-radius:8px;margin-top:4px;font-family:monospace;word-break:break-all;"></div>
 							</div>
 							<div id="redirect-status" style="display:none;font-size:13px;padding:8px 12px;border-radius:8px;margin-top:8px;"></div>
+						</div>
+						<div class="m3-card" id="settings-panel-album-redirect" style="display:none;padding:20px 16px;">
+							<div style="margin-bottom:16px;">
+								<div style="font-size:13px;opacity:0.6;margin-bottom:12px;">Search for an album, then paste new Drive IDs — one per line, in track order — to redirect every track at once.</div>
+								<input id="album-redirect-search-input" type="text" placeholder="Search albums..." autocomplete="off" style="width:100%;box-sizing:border-box;padding:10px 14px;border-radius:10px;border:1px solid color-mix(in srgb,var(--md-sys-color-primary) 30%,transparent);background:color-mix(in srgb,var(--md-sys-color-surface-variant) 60%,transparent);color:inherit;font-size:14px;outline:none;" oninput="albumRedirectPanelSearch(this.value)">
+							</div>
+							<div id="album-redirect-search-results" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;margin-bottom:16px;"></div>
+							<div id="album-redirect-selected" style="display:none;background:color-mix(in srgb,var(--md-sys-color-primary) 10%,transparent);border-radius:10px;padding:12px 14px;margin-bottom:12px;">
+								<div style="font-size:11px;opacity:0.5;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;">Selected album</div>
+								<div id="album-redirect-selected-title" style="font-weight:600;font-size:14px;"></div>
+								<div id="album-redirect-selected-artist" style="font-size:12px;opacity:0.6;margin-top:2px;"></div>
+								<div id="album-redirect-track-list" style="display:flex;flex-direction:column;gap:4px;margin-top:10px;max-height:240px;overflow-y:auto;"></div>
+							</div>
+							<div id="album-redirect-form" style="display:none;flex-direction:column;gap:10px;">
+								<div style="display:flex;gap:8px;">
+									<input id="album-redirect-folder-input" type="text" placeholder="Paste a Drive folder link to auto-fill IDs (optional)" autocomplete="off" style="flex:1;box-sizing:border-box;padding:10px 14px;border-radius:10px;border:1px solid color-mix(in srgb,var(--md-sys-color-primary) 30%,transparent);background:color-mix(in srgb,var(--md-sys-color-surface-variant) 60%,transparent);color:inherit;font-size:13px;font-family:monospace;outline:none;" onkeydown="if(event.key==='Enter'){event.preventDefault();albumRedirectFillFromFolder();}">
+									<button class="m3-btn m3-btn-tonal" id="album-redirect-folder-fill-btn" onclick="albumRedirectFillFromFolder()"><i class="fa-solid fa-folder-open"></i> Fill</button>
+								</div>
+								<div id="album-redirect-folder-status" style="display:none;font-size:12px;padding:6px 10px;border-radius:8px;"></div>
+								<textarea id="album-redirect-ids-input" placeholder="New Drive IDs or Drive links, one per line, in track order" autocomplete="off" rows="6" style="width:100%;box-sizing:border-box;padding:10px 14px;border-radius:10px;border:1px solid color-mix(in srgb,var(--md-sys-color-primary) 30%,transparent);background:color-mix(in srgb,var(--md-sys-color-surface-variant) 60%,transparent);color:inherit;font-size:13px;font-family:monospace;outline:none;resize:vertical;" oninput="albumRedirectValidateCount()"></textarea>
+								<div id="album-redirect-count-hint" style="font-size:12px;opacity:0.55;"></div>
+								<div style="display:flex;gap:8px;">
+									<button class="m3-btn m3-btn-filled" id="album-redirect-submit-btn" style="flex:1;justify-content:center;" onclick="submitAlbumBatchRedirect()"><i class="fa-solid fa-check"></i> Redirect Entire Album</button>
+									<button class="m3-btn m3-btn-tonal" onclick="clearAlbumRedirectSelection()"><i class="fa-solid fa-xmark"></i></button>
+								</div>
+							</div>
+							<div id="album-redirect-progress" style="display:none;flex-direction:column;gap:4px;margin-top:12px;"></div>
+							<div id="album-redirect-status" style="display:none;font-size:13px;padding:8px 12px;border-radius:8px;margin-top:8px;"></div>
+						</div>
+						<div class="m3-card" id="settings-panel-lossless" style="display:none;padding:20px 16px;">
+							<div style="margin-bottom:16px;">
+								<div style="font-size:13px;opacity:0.6;margin-bottom:12px;">Search for an album, then paste lossless Drive IDs (FLAC/WAV/ALAC) — one per line, in track order — to add a lossless version of every track at once.</div>
+								<input id="lossless-search-input" type="text" placeholder="Search albums..." autocomplete="off" style="width:100%;box-sizing:border-box;padding:10px 14px;border-radius:10px;border:1px solid color-mix(in srgb,var(--md-sys-color-primary) 30%,transparent);background:color-mix(in srgb,var(--md-sys-color-surface-variant) 60%,transparent);color:inherit;font-size:14px;outline:none;" oninput="losslessPanelSearch(this.value)">
+							</div>
+							<div id="lossless-search-results" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;margin-bottom:16px;"></div>
+							<div id="lossless-selected" style="display:none;background:color-mix(in srgb,var(--md-sys-color-primary) 10%,transparent);border-radius:10px;padding:12px 14px;margin-bottom:12px;">
+								<div style="font-size:11px;opacity:0.5;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.05em;">Selected album</div>
+								<div id="lossless-selected-title" style="font-weight:600;font-size:14px;"></div>
+								<div id="lossless-selected-artist" style="font-size:12px;opacity:0.6;margin-top:2px;"></div>
+								<div id="lossless-track-list" style="display:flex;flex-direction:column;gap:4px;margin-top:10px;max-height:240px;overflow-y:auto;"></div>
+							</div>
+							<div id="lossless-form" style="display:none;flex-direction:column;gap:10px;">
+								<div style="display:flex;gap:8px;">
+									<input id="lossless-folder-input" type="text" placeholder="Paste a Drive folder link to auto-fill IDs (optional)" autocomplete="off" style="flex:1;box-sizing:border-box;padding:10px 14px;border-radius:10px;border:1px solid color-mix(in srgb,var(--md-sys-color-primary) 30%,transparent);background:color-mix(in srgb,var(--md-sys-color-surface-variant) 60%,transparent);color:inherit;font-size:13px;font-family:monospace;outline:none;" onkeydown="if(event.key==='Enter'){event.preventDefault();losslessFillFromFolder();}">
+									<button class="m3-btn m3-btn-tonal" id="lossless-folder-fill-btn" onclick="losslessFillFromFolder()"><i class="fa-solid fa-folder-open"></i> Fill</button>
+								</div>
+								<div id="lossless-folder-status" style="display:none;font-size:12px;padding:6px 10px;border-radius:8px;"></div>
+								<textarea id="lossless-ids-input" placeholder="Lossless Drive IDs or Drive links, one per line, in track order" autocomplete="off" rows="6" style="width:100%;box-sizing:border-box;padding:10px 14px;border-radius:10px;border:1px solid color-mix(in srgb,var(--md-sys-color-primary) 30%,transparent);background:color-mix(in srgb,var(--md-sys-color-surface-variant) 60%,transparent);color:inherit;font-size:13px;font-family:monospace;outline:none;resize:vertical;" oninput="losslessValidateCount()"></textarea>
+								<div id="lossless-count-hint" style="font-size:12px;opacity:0.55;"></div>
+								<div style="display:flex;gap:8px;">
+									<button class="m3-btn m3-btn-filled" id="lossless-submit-btn" style="flex:1;justify-content:center;" onclick="submitAlbumLossless()"><i class="fa-solid fa-gem"></i> Add Lossless to Entire Album</button>
+									<button class="m3-btn m3-btn-tonal" onclick="clearLosslessSelection()"><i class="fa-solid fa-xmark"></i></button>
+								</div>
+							</div>
+							<div id="lossless-progress" style="display:none;flex-direction:column;gap:4px;margin-top:12px;"></div>
+							<div id="lossless-status" style="display:none;font-size:13px;padding:8px 12px;border-radius:8px;margin-top:8px;"></div>
 						</div>
 						<div class="m3-card" id="settings-panel-art-redirect" style="display:none;padding:20px 16px;margin-bottom:16px;">
 							<div style="margin-bottom:16px;">
@@ -14941,6 +15063,7 @@
 								<button id="mobileShareBtn" class="mobile-share-btn" onclick="event.stopPropagation(); shareCurrentTrack()" title="Share" style="display:none;">
 										<i class="fa-solid fa-share-nodes"></i>
 									</button>
+									<span id="npLosslessBadge" class="lossless-badge" style="display:none;position:absolute;bottom:8px;right:24px;"><i class="fa-solid fa-gem"></i>Lossless</span>
 								</footer>
 								<audio id="player" crossorigin="anonymous" preload="metadata" preservesPitch="false"></audio>
 								<audio id="player2" crossorigin="anonymous" preload="metadata" preservesPitch="false"></audio>
@@ -14960,7 +15083,7 @@
 											</div>
 											<div class="clean-controls-panel">
 												<div class="clean-info-panel">
-													<div id="deTitle" class="clean-title">No Track</div>
+													<div id="deTitle" class="clean-title" style="display:flex;align-items:center;gap:6px;"><span id="deTitleText">No Track</span><span id="deLosslessBadge" class="lossless-badge lossless-badge-lg" style="display:none;"><i class="fa-solid fa-gem"></i>Lossless</span></div>
 													<div id="deArtist" class="clean-artist">Select music</div>
 													<div id="fsTitle" style="display:none;">No Track</div>
 													<div id="fsArtist" style="display:none;">Select music</div>
@@ -15099,6 +15222,126 @@ const COLOR_WORKER_URL = "https://gootcolor.goot-api.workers.dev";
 const METADATA_API_URL = SCANNER_WORKER_URL;
 const SEARCH_API_URL = PLAYER_WORKER_URL;
 const STREAMING_URL = PLAYER_WORKER_URL;
+/**
+ * Lossless streaming preference (global toggle in Settings).
+ * When enabled, all playback/buffer URLs ask the worker for the lossless
+ * version of a track if one has been set via the Lossless admin panel;
+ * the worker silently falls back to the normal file when none exists.
+ */
+function isLosslessPreferred() {
+    return localStorage.getItem('goot_prefer_lossless') === 'true';
+}
+function streamUrl(id, extraParams = '') {
+    return `${STREAMING_URL}?id=${id}${isLosslessPreferred() ? '&lossless=1' : ''}${extraParams}`;
+}
+/**
+ * Lossless availability badges.
+ * Reuses the same /lossless/check worker endpoint that folder downloads use
+ * to find out which track IDs have a lossless (FLAC/WAV/ALAC) version on file.
+ * Results are cached client-side per session since availability rarely changes
+ * mid-session and we don't want to spam the worker on every track change.
+ */
+const _losslessAvailCache = new Map(); // trackId -> boolean
+const _losslessAvailPending = new Map(); // trackId -> Promise (in-flight de-dupe)
+async function checkLosslessAvailability(ids) {
+    const uncachedIds = ids.filter(id => id && !_losslessAvailCache.has(id));
+    if (uncachedIds.length) {
+        const idsParam = uncachedIds.map(id => encodeURIComponent(id)).join(',');
+        let fetchPromise = _losslessAvailPending.get(idsParam);
+        if (!fetchPromise) {
+            fetchPromise = fetch(`${PLAYER_WORKER_URL}/lossless/check?ids=${idsParam}`)
+                .then(res => res.ok ? res.json() : null)
+                .then(data => {
+                    const available = data?.available || {};
+                    uncachedIds.forEach(id => _losslessAvailCache.set(id, !!available[id]));
+                })
+                .catch(() => {
+                    uncachedIds.forEach(id => { if (!_losslessAvailCache.has(id)) _losslessAvailCache.set(id, false); });
+                })
+                .finally(() => _losslessAvailPending.delete(idsParam));
+            _losslessAvailPending.set(idsParam, fetchPromise);
+        }
+        await fetchPromise;
+    }
+    const result = {};
+    ids.forEach(id => { result[id] = _losslessAvailCache.get(id) || false; });
+    return result;
+}
+/**
+ * Updates the Now Playing lossless badges (mini player + desktop extended view)
+ * for whichever track is currently loaded. Badge shows only when a lossless
+ * version actually exists for the track AND the user has Prefer Lossless
+ * Streaming enabled (since that's what determines whether it's really being
+ * streamed lossless right now).
+ */
+async function updateNowPlayingLosslessBadge() {
+    const npBadge = document.getElementById('npLosslessBadge');
+    const deBadge = document.getElementById('deLosslessBadge');
+    const currentTrack = queue[qIndex];
+    if (!currentTrack || !currentTrack.id) {
+        if (npBadge) npBadge.style.display = 'none';
+        if (deBadge) deBadge.style.display = 'none';
+        return;
+    }
+    const trackId = currentTrack.id;
+    const isPreferred = isLosslessPreferred();
+    if (!isPreferred) {
+        if (npBadge) npBadge.style.display = 'none';
+        if (deBadge) deBadge.style.display = 'none';
+        return;
+    }
+    try {
+        const result = await checkLosslessAvailability([trackId]);
+        // Bail if the track changed while the check was in flight
+        if (queue[qIndex]?.id !== trackId) return;
+        const show = !!result[trackId];
+        if (npBadge) npBadge.style.display = show ? 'inline-flex' : 'none';
+        if (deBadge) deBadge.style.display = show ? 'inline-flex' : 'none';
+    } catch (e) {
+        if (npBadge) npBadge.style.display = 'none';
+        if (deBadge) deBadge.style.display = 'none';
+    }
+}
+/**
+ * Updates the album-view header badge to show whether any/all tracks in the
+ * currently-viewed album have a lossless version available.
+ */
+async function updateAlbumViewLosslessBadge(tracks) {
+    const wrap = document.getElementById('folderCoverLossless');
+    const textEl = document.getElementById('folderCoverLosslessText');
+    if (!wrap || !textEl) return;
+    const ids = (tracks || []).map(t => t.id).filter(Boolean);
+    if (!ids.length) { wrap.style.display = 'none'; return; }
+    try {
+        const result = await checkLosslessAvailability(ids);
+        const availableCount = ids.filter(id => result[id]).length;
+        if (availableCount === 0) {
+            wrap.style.display = 'none';
+            return;
+        }
+        textEl.textContent = availableCount >= ids.length ? 'Lossless' : `Lossless (${availableCount}/${ids.length})`;
+        wrap.style.display = '';
+    } catch (e) {
+        wrap.style.display = 'none';
+    }
+}
+/**
+ * Reveals the per-row "LOSSLESS" badge in a rendered track table (album view,
+ * playlist view, etc.) for any track that has a lossless version available.
+ * Runs after rows are already in the DOM so it never blocks initial render.
+ */
+async function populateSongRowLosslessBadges(tracks) {
+    const ids = (tracks || []).map(t => t.id).filter(Boolean);
+    if (!ids.length) return;
+    try {
+        const result = await checkLosslessAvailability(ids);
+        ids.forEach(id => {
+            if (!result[id]) return;
+            const badge = document.getElementById(`lossless-row-${id}`);
+            if (badge) badge.style.display = 'inline-block';
+        });
+    } catch (e) { /* lossless check failed — badges just stay hidden */ }
+}
 const CLIENT_AUDIO_CACHE = 'goot-audio-v1';
 const _clientAudioBlobUrls = {}; // trackId → blob URL (session memory, revoked on clear)
 const completedTrackBuffers = new Map(); // trackId → ArrayBuffer
@@ -15126,7 +15369,7 @@ async function saveTrackToClientCache(trackId) {
         } else if (pendingWorkerFetches.has(trackId)) {
             buf = await pendingWorkerFetches.get(trackId);
         } else {
-            const res = await fetch(`${STREAMING_URL}?id=${trackId}`, { priority: 'low' });
+            const res = await fetch(streamUrl(trackId), { priority: 'low' });
             if (!res.ok) return;
             const expectedLen = parseInt(res.headers.get('Content-Length') || '0', 10);
             buf = await res.arrayBuffer();
@@ -15964,7 +16207,7 @@ function refreshAllUIForTrack(trackId) {
         if (fsTitle) fsTitle.textContent = meta.title || 'Unknown Track';
         if (fsArtist) fsArtist.textContent = formatArtist(meta.artist) || 'Unknown Artist';
         if (fsAlbum) fsAlbum.textContent = meta.album || '';
-        const deTitle = document.getElementById('deTitle');
+        const deTitle = document.getElementById('deTitleText');
         const deArtist = document.getElementById('deArtist');
         if (deTitle) deTitle.textContent = meta.title || 'Unknown Track';
         if (deArtist) deArtist.textContent = formatArtist(meta.artist) || 'Unknown Artist';
@@ -16892,7 +17135,7 @@ async function fetchTrackBytes(trackId) {
             } catch (_) {}
         }
         try {
-            const res = await fetch(`${STREAMING_URL}?id=${trackId}`, {
+            const res = await fetch(streamUrl(trackId), {
                 mode: 'cors',
                 credentials: 'omit',
                 cache: 'default',
@@ -16909,7 +17152,7 @@ async function fetchTrackBytes(trackId) {
             return buf;
         } catch (_) {
             try {
-                const res = await fetch(`${STREAMING_URL}?id=${trackId}`, {
+                const res = await fetch(streamUrl(trackId), {
                     mode: 'cors', credentials: 'omit', cache: 'default', priority: 'low'
                 });
                 return res.ok ? res.arrayBuffer() : null;
@@ -16941,6 +17184,7 @@ let isBulkMetadataLoading = false; // Flag to prevent color extraction lag durin
 const DB_NAME = 'GootPlayerDB';
 const DB_VERSION = 4; // v4: added pinnedItems store (migrated from localStorage)
 const LISTEN_AGAIN_STORAGE_VERSION = 5; // Version 5: pinned art stored as Cache API blob URLs, not base64
+const METADATA_STORE_VERSION = 'metadata-store-v16'; // Bump this (and only this) to force a full trackMetadata cache wipe/migration
 let metaDB = null;
 let metaDBReady = false;
 async function initMetaDB() {
@@ -16996,7 +17240,7 @@ async function loadTrackMetadataFromDB() {
                 const result = request.result || [];
                 let hasOldMetadata = false;
                 for (const item of result) {
-                    if (!item.metadataVersion || item.metadataVersion !== 'metadata-store-v15') {
+                    if (!item.metadataVersion || item.metadataVersion !== METADATA_STORE_VERSION) {
                         hasOldMetadata = true;
                                                 break; // Found at least one old entry, that's enough
                     }
@@ -17106,7 +17350,7 @@ async function saveTrackMetadataToDB(id, data) {
                 id,
                 data,
                 timestamp: Date.now(),
-                metadataVersion: 'metadata-store-v15' // GootV4 Beta metadata store version
+                metadataVersion: METADATA_STORE_VERSION // GootV4 Beta metadata store version
             });
             transaction.oncomplete = () => resolve(true);
             transaction.onerror = () => reject(transaction.error);
@@ -17652,7 +17896,7 @@ async function refreshAllUIMetadata() {
         if (fsTitle) fsTitle.textContent = cleanDisplayName(m.title || currentTrack.title || currentTrack.name) || "Unknown Track";
         if (fsArtist) fsArtist.textContent = formatArtist(m.artist || currentTrack.artist) || "Unknown Artist";
         if (fsAlbum) fsAlbum.textContent = m.album || currentTrack.album || "Unknown Album";
-        const deTitle = document.getElementById("deTitle");
+        const deTitle = document.getElementById("deTitleText");
         const deArtist = document.getElementById("deArtist");
         if (deTitle) deTitle.textContent = cleanDisplayName(m.title || currentTrack.title || currentTrack.name) || "Unknown Track";
         if (deArtist) deArtist.textContent = formatArtist(m.artist || currentTrack.artist) || "Unknown Artist";
@@ -18149,7 +18393,7 @@ async function saveCompleteTrackMetadata(trackId, metadata) {
         composer: metadata.composer || '',
         comment: metadata.comment || '',
         timestamp: Date.now(),
-        metadataVersion: 'metadata-store-v15'
+        metadataVersion: METADATA_STORE_VERSION
     };
     _idbWriteQueue.set(trackId, record);
     _scheduleIDBFlush();
@@ -20094,6 +20338,8 @@ async function init() {
     const _startupBase = localStorage.getItem('goot_accent_base') || localStorage.getItem('goot_accent') || '#00AAFF';
     updateTheme(typeof _getAccentAdjustedHex === 'function' ? _getAccentAdjustedHex(_startupBase) : _startupBase, true);
     document.getElementById('albumColorToggle').checked = localStorage.getItem('goot_album_color') === 'true';
+    const losslessToggleEl = document.getElementById('losslessToggle');
+    if (losslessToggleEl) losslessToggleEl.checked = isLosslessPreferred();
     document.getElementById('animationsToggle').checked = localStorage.getItem('goot_animations_disabled') === 'true';
     if (localStorage.getItem('goot_animations_disabled') === 'true') {
         document.documentElement.classList.add('animations-disabled');
@@ -20869,6 +21115,7 @@ async function loadFolders(id, refresh = false) {
                 const parentName = stack[stack.length - 2]?.name || '';
                 coverTitleEl.textContent = cleanFolderName(_thisFolderName);
                 coverMetaEl.textContent = parentName;
+                updateAlbumViewLosslessBadge(tracks);
                 let _bgSet = false;
                 const _applyBannerArt = (artUrl, albumName) => {
                     if (_bgSet) return;
@@ -21773,7 +22020,7 @@ function renderTrackTable(tracks, container, isPlaylist = false, pName = "", ani
                 <\!-- Title + artist -->
                 <td style="padding:10px 12px;">
                     <div class="song-row-info">
-                        <div class="song-row-title meta-title">${m.title}${(t._isVideo || m._isVideo) ? ' <span class="song-row-video-badge"><i class="fa-solid fa-film" style="font-size:8px;margin-right:2px;"></i>VIDEO</span>' : ''}</div>
+                        <div class="song-row-title meta-title">${m.title}${(t._isVideo || m._isVideo) ? ' <span class="song-row-video-badge"><i class="fa-solid fa-film" style="font-size:8px;margin-right:2px;"></i>VIDEO</span>' : ''}<span class="song-row-lossless-badge" id="lossless-row-${t.id}" style="display:none;"><i class="fa-solid fa-gem" style="font-size:8px;margin-right:2px;"></i>LOSSLESS</span></div>
                         <div class="song-row-artist meta-artist" data-artist-tag="${(m.artist||'').replace(/"/g,'&quot;')}" title="Go to artist folder">${renderArtistSpansSync(m.artist||'')}</div>
                     </div>
                 </td>
@@ -21802,6 +22049,7 @@ function renderTrackTable(tracks, container, isPlaylist = false, pName = "", ani
     if (typeof scheduleRatingCountsForRows === 'function') {
         scheduleRatingCountsForRows(tracks.map(t => t.id));
     }
+    populateSongRowLosslessBadges(tracks);
     if (typeof applyBlockedStyles === 'function') applyBlockedStyles();
     if (localStorage.getItem('goot_compact_rows') === 'true') {
         const table = container.closest('table');
@@ -22415,7 +22663,7 @@ function lightweightMetadataUpdate() {
             if (fsTitle) fsTitle.innerText = m.title || "Unknown Track";
             if (fsArtist) fsArtist.innerText = formatArtist(m.artist) || "Unknown Artist";
             if (fsAlbum) fsAlbum.innerText = m.album || "Unknown Album";
-            const deTitle = document.getElementById("deTitle");
+            const deTitle = document.getElementById("deTitleText");
             const deArtist = document.getElementById("deArtist");
             if (deTitle) deTitle.innerText = m.title || "Unknown Track";
             if (deArtist) deArtist.innerText = m.artist || "Unknown Artist";
@@ -22724,7 +22972,7 @@ function updateNowPlayingWithMetadata() {
     const npTitle = document.getElementById('npTitle');
     const npArtist = document.getElementById('npArtist');
     const npAlbum = document.getElementById('npAlbum');
-    const deTitle = document.getElementById('deTitle');
+    const deTitle = document.getElementById('deTitleText');
     const deArtist = document.getElementById('deArtist');
     const fsTitle = document.getElementById('fsTitle');
     const fsArtist = document.getElementById('fsArtist');
@@ -22740,6 +22988,7 @@ function updateNowPlayingWithMetadata() {
     } else {
         syncNowPlayingArt(null, meta.album || '');
     }
+    updateNowPlayingLosslessBadge();
 }
 const artExtractionAttempted = new Set();
 async function loadMetaAndArt(id, name) {
@@ -24321,6 +24570,21 @@ function isMp3Format(mimeType, fileName) {
     return ext === 'mp3';
 }
 /**
+ * Maps a Content-Type to a sensible file extension for non-mp3 audio
+ * (lossless formats in particular, where the original folder filename's
+ * extension would be wrong once we've swapped in a different file).
+ * Falls back to the provided fallback extension when the mime is unrecognized.
+ */
+function extFromMime(mimeType, fallbackExt) {
+    const mime = (mimeType || '').toLowerCase();
+    if (mime.includes('flac')) return 'flac';
+    if (mime.includes('wav')) return 'wav';
+    if (mime.includes('alac') || mime.includes('mp4') || mime.includes('m4a')) return 'm4a';
+    if (mime.includes('ogg')) return 'ogg';
+    if (mime.includes('aiff')) return 'aiff';
+    return fallbackExt || 'mp3';
+}
+/**
  * Fetches a track's playable audio bytes (resolving any server-side redirect)
  * plus, separately, the ORIGINAL (non-redirected) file's bytes when a redirect
  * exists, so existing tags (comments, lyrics, track/disc numbers, genre, year,
@@ -24336,9 +24600,10 @@ function isMp3Format(mimeType, fileName) {
  * @returns {Promise<{arrayBuffer: ArrayBuffer, mimeType: string, trackNumber: number|null}|null>}
  */
 async function prepareTrackAudio(trackId, meta, opts = {}) {
-    const { mimeHint = '', fileName = '' } = opts;
+    const { mimeHint = '', fileName = '', lossless = false } = opts;
     const mimeParam = mimeHint ? `&mime=${encodeURIComponent(mimeHint)}` : '';
-    const audioRes = await fetch(`${STREAMING_URL}?id=${trackId}${mimeParam}`);
+    const losslessParam = lossless ? '&lossless=1' : '';
+    const audioRes = await fetch(`${STREAMING_URL}?id=${trackId}${mimeParam}${losslessParam}`);
     if (!audioRes.ok) return null;
     let audioBuffer = await audioRes.arrayBuffer();
     const mimeType = audioRes.headers.get('content-type') || mimeHint || '';
@@ -24404,12 +24669,15 @@ async function prepareTrackAudio(trackId, meta, opts = {}) {
  * (edited titles, artists, album, and album art / folder-map redirects) as
  * ID3 tags before download. Returns null on fetch failure.
  */
-async function buildTaggedDownload(track) {
+async function buildTaggedDownload(track, opts = {}) {
+    const { lossless = false } = opts;
     const meta = await getCentralTrackMetadata(track.id);
-    const result = await prepareTrackAudio(track.id, meta, { mimeHint: track.mimeType, fileName: track.name });
+    const result = await prepareTrackAudio(track.id, meta, { mimeHint: lossless ? '' : track.mimeType, fileName: track.name, lossless });
     if (!result) return null;
     const origExt = (track.name.match(/\.([^.]+)$/) || [, 'mp3'])[1];
-    const ext = isMp3Format(result.mimeType, track.name) ? 'mp3' : origExt;
+    const ext = isMp3Format(result.mimeType, track.name)
+        ? 'mp3'
+        : (lossless ? extFromMime(result.mimeType, origExt) : origExt);
     const trackNumPrefix = (result.trackNumber !== null) ? String(result.trackNumber).padStart(2, '0') + '. ' : '';
     const baseTitle = (meta.title && meta.title !== 'Unknown Track') ? meta.title : track.name.replace(/\.[^/.]+$/, '');
     const artist = (meta.artist && meta.artist !== 'Unknown Artist') ? meta.artist : '';
@@ -24466,10 +24734,68 @@ async function downloadCurrentFolder() {
             showShareToast('No audio files in folder', 'error');
             return;
         }
+        let lossless = false;
+        try {
+            const idsParam = tracks.map(t => encodeURIComponent(t.id)).join(',');
+            const checkRes = await fetch(`${PLAYER_WORKER_URL}/lossless/check?ids=${idsParam}`);
+            if (checkRes.ok) {
+                const { available } = await checkRes.json();
+                const availableCount = available ? Object.keys(available).length : 0;
+                if (availableCount > 0) {
+                    const choice = await showLosslessDownloadChoice(availableCount, tracks.length);
+                    if (choice === null) return; // user cancelled
+                    lossless = choice;
+                }
+            }
+        } catch (e) { /* lossless check failed — fall back to normal-only download */ }
+        await _performFolderDownload(currentFolder, tracks, lossless);
+    } catch (err) {
+        showShareToast('Failed to create zip file', 'error');
+    }
+}
+/**
+ * Shows a modal letting the user pick Normal or Lossless quality before a
+ * folder download, when at least one track in the folder has a lossless
+ * version available. Resolves to true (lossless), false (normal), or
+ * null if the user cancels.
+ */
+function showLosslessDownloadChoice(availableCount, totalCount) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.style.cssText = `
+            position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 10000; backdrop-filter: blur(8px);
+        `;
+        const allHaveLossless = availableCount >= totalCount;
+        const subtext = allHaveLossless
+            ? `All ${totalCount} tracks have a lossless version.`
+            : `${availableCount} of ${totalCount} tracks have a lossless version — the rest will download normal quality.`;
+        overlay.innerHTML = `
+            <div style="background:var(--md-sys-color-surface-variant);padding:24px;border-radius:20px;max-width:380px;width:90%;border:1px solid var(--md-sys-color-outline);">
+                <h3 style="margin:0 0 8px 0;font-size:18px;">Choose download quality</h3>
+                <div style="font-size:13px;opacity:0.65;margin-bottom:20px;">${subtext}</div>
+                <div style="display:flex;flex-direction:column;gap:10px;">
+                    <button id="lossless-choice-lossless" class="m3-btn m3-btn-filled" style="justify-content:center;"><i class="fa-solid fa-gem"></i> Lossless</button>
+                    <button id="lossless-choice-normal" class="m3-btn m3-btn-tonal" style="justify-content:center;">Normal Quality</button>
+                    <button id="lossless-choice-cancel" class="m3-btn" style="justify-content:center;opacity:0.6;">Cancel</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        const cleanup = (value) => { overlay.remove(); resolve(value); };
+        overlay.querySelector('#lossless-choice-lossless').addEventListener('click', () => cleanup(true));
+        overlay.querySelector('#lossless-choice-normal').addEventListener('click', () => cleanup(false));
+        overlay.querySelector('#lossless-choice-cancel').addEventListener('click', () => cleanup(null));
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) cleanup(null); });
+    });
+}
+async function _performFolderDownload(currentFolder, tracks, lossless) {
+    try {
         if (tracks.length === 1) {
             const track = tracks[0];
-            showShareToast('Downloading track...');
-            const result = await buildTaggedDownload(track);
+            showShareToast(lossless ? 'Downloading lossless track...' : 'Downloading track...');
+            const result = await buildTaggedDownload(track, { lossless });
             if (!result) {
                 showShareToast('Failed to download track', 'error');
                 return;
@@ -24486,12 +24812,12 @@ async function downloadCurrentFolder() {
             showShareToast(`Downloaded "${result.fileName}"!`, 'success');
             return;
         }
-        showShareToast(`Creating zip with ${tracks.length} tracks...`);
+        showShareToast(`Creating zip with ${tracks.length} tracks${lossless ? ' (lossless)' : ''}...`);
         const zip = new JSZip();
         let completed = 0;
         for (const track of tracks) {
             try {
-                const result = await buildTaggedDownload(track);
+                const result = await buildTaggedDownload(track, { lossless });
                 if (!result) {
                     continue;
                 }
@@ -24521,7 +24847,7 @@ async function downloadCurrentFolder() {
         const zipUrl = URL.createObjectURL(zipBlob);
         const link = document.createElement('a');
         link.href = zipUrl;
-        link.download = `${currentFolder.name.replace(/[<>:"/\\|?*]/g, '_')}.zip`;
+        link.download = `${currentFolder.name.replace(/[<>:"/\\|?*]/g, '_')}${lossless ? ' (Lossless)' : ''}.zip`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -25984,7 +26310,7 @@ function play(idxOrId) {
     player2.pause();
     player2.src = '';
     player2.currentTime = 0;
-    const _streamUrl = STREAMING_URL + "?id=" + t.id;
+    const _streamUrl = streamUrl(t.id);
     const _instantBlob = _clientAudioBlobUrls[t.id];
     player.src = _instantBlob || _streamUrl;
     if (!_isPartyGuest()) {
@@ -26094,7 +26420,7 @@ function updateNowPlayingWithData(t) {
     if (npTitle) npTitle.textContent = title;
     if (npArtist) setNpArtist(artist);
     if (npAlbum) npAlbum.textContent = album;
-    const deTitle = DOM_CACHE.get("deTitle");
+    const deTitle = DOM_CACHE.get("deTitleText");
     const deArtist = DOM_CACHE.get("deArtist");
     if (deTitle) deTitle.textContent = title;
     if (deArtist) deArtist.textContent = formatArtist(artist);
@@ -26104,6 +26430,7 @@ function updateNowPlayingWithData(t) {
     if (fsTitle) fsTitle.textContent = title;
     if (fsArtist) fsArtist.textContent = formatArtist(artist);
     if (fsAlbum) fsAlbum.textContent = album;
+    updateNowPlayingLosslessBadge();
     const albumName = album;
     let artHTML = '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-music" style="opacity:0.35;font-size:28px;"></i></div>';
     let fsArtHTML = '<i class="fa-solid fa-music"></i>';
@@ -26174,7 +26501,7 @@ function updateQueueAndNowPlayingWithMetadata(trackId) {
     if (npTitle) npTitle.innerText = title;
     if (npArtist) setNpArtist(artist);
     if (npAlbum) npAlbum.innerText = album;
-    const deTitle = document.getElementById("deTitle");
+    const deTitle = document.getElementById("deTitleText");
     const deArtist = document.getElementById("deArtist");
     if (deTitle) deTitle.innerText = title;
     if (deArtist) deArtist.innerText = artist;
@@ -26183,6 +26510,7 @@ function updateQueueAndNowPlayingWithMetadata(trackId) {
     const fsAlbum = document.getElementById("fsAlbum");
     if (fsTitle) fsTitle.innerText = title;
     if (fsArtist) fsArtist.innerText = artist;
+    updateNowPlayingLosslessBadge();
     if (fsAlbum) fsAlbum.innerText = album;
     const track = queue[qIndex];
     const artSrc = track ? getAlbumArtForTrack(track) : '';
@@ -28586,6 +28914,10 @@ function _redirectTapUnlock() {
         if (btn) {
             btn.style.display = '';
             if (artBtn) artBtn.style.display = '';
+            const albumRedirectBtn = document.getElementById('settings-nav-album-redirect');
+            if (albumRedirectBtn) albumRedirectBtn.style.display = '';
+            const losslessBtn = document.getElementById('settings-nav-lossless');
+            if (losslessBtn) losslessBtn.style.display = '';
             const chartRenameBtn = document.getElementById('settings-nav-chart-rename');
             if (chartRenameBtn) chartRenameBtn.style.display = '';
             const folderMapBtn = document.getElementById('settings-nav-folder-map');
@@ -28727,6 +29059,468 @@ async function submitTrackRedirect() {
         status.style.background = 'color-mix(in srgb,#ef4444 15%,transparent)';
         status.style.display = '';
     }
+}
+// ---------------- Album Batch Redirect ----------------
+let _albumRedirectSearchTimeout = null;
+const _albumRedirectSearchResults = new Map(); // album+artist key -> {album, artist}
+let _albumRedirectTracks = []; // sorted track list for the selected album: [{id, title, artist, track_number}]
+function albumRedirectPanelSearch(query) {
+    clearTimeout(_albumRedirectSearchTimeout);
+    const results = document.getElementById('album-redirect-search-results');
+    if (!query.trim()) { results.innerHTML = ''; return; }
+    results.innerHTML = '<div style="font-size:13px;opacity:0.4;padding:8px 4px;">Searching…</div>';
+    _albumRedirectSearchTimeout = setTimeout(async () => {
+        try {
+            const res = await fetch(`${SEARCH_API_URL}/metadata/search/ai`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query })
+            });
+            if (!res.ok) throw new Error(res.status);
+            const data = await res.json();
+            // Group tracks by album+artist so we can offer album-level choices, same data the AI search already returns.
+            const tracks = data.tracks || [];
+            const albumMap = new Map();
+            tracks.forEach(t => {
+                const album = t.album || '';
+                if (!album) return;
+                const artist = t.album_artist || t.artist || '';
+                const key = album.toLowerCase() + '|' + artist.toLowerCase();
+                if (!albumMap.has(key)) albumMap.set(key, { album, artist, count: 0 });
+                albumMap.get(key).count++;
+            });
+            const albums = Array.from(albumMap.entries()).slice(0, 20);
+            if (albums.length === 0) {
+                results.innerHTML = '<div style="font-size:13px;opacity:0.4;padding:8px 4px;">No results</div>';
+                return;
+            }
+            _albumRedirectSearchResults.clear();
+            albums.forEach(([key, info]) => _albumRedirectSearchResults.set(key, info));
+            results.innerHTML = albums.map(([key, info]) => `
+                <div data-album-redirect-key="${key}"
+                    style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;background:color-mix(in srgb,var(--md-sys-color-surface-variant) 40%,transparent);transition:background 0.15s;">
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${cleanDisplayName(info.album)}</div>
+                        <div style="font-size:11px;opacity:0.55;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${info.artist}</div>
+                    </div>
+                    <div style="font-size:11px;opacity:0.4;">${info.count} track${info.count === 1 ? '' : 's'}</div>
+                </div>`).join('');
+            results.querySelectorAll('[data-album-redirect-key]').forEach(el => {
+                el.addEventListener('click', () => {
+                    const info = _albumRedirectSearchResults.get(el.dataset.albumRedirectKey);
+                    if (info) albumRedirectSelectAlbum(info.album, info.artist, query);
+                });
+            });
+        } catch(e) {
+            results.innerHTML = '<div style="font-size:13px;opacity:0.4;padding:8px 4px;">Search failed</div>';
+        }
+    }, 350);
+}
+async function albumRedirectSelectAlbum(album, artist, originalQuery) {
+    const status = document.getElementById('album-redirect-status');
+    status.style.display = 'none';
+    document.getElementById('album-redirect-search-results').innerHTML = '';
+    document.getElementById('album-redirect-search-input').value = '';
+    document.getElementById('album-redirect-selected-title').textContent = cleanDisplayName(album);
+    document.getElementById('album-redirect-selected-artist').textContent = artist;
+    const trackListEl = document.getElementById('album-redirect-track-list');
+    trackListEl.innerHTML = '<div style="font-size:12px;opacity:0.4;padding:4px;">Loading tracks…</div>';
+    document.getElementById('album-redirect-selected').style.display = '';
+    document.getElementById('album-redirect-form').style.display = 'none';
+    try {
+        // Dedicated, uncapped lookup — bypasses /metadata/search/ai entirely (that endpoint caps
+        // its flat track list at 30, which silently dropped tracks on larger albums).
+        const params = new URLSearchParams({ album, artist: artist || '' });
+        const res = await fetch(`${SEARCH_API_URL}/metadata/album-tracks?${params}`);
+        const data = await res.json();
+        const allTracks = data.tracks || [];
+        _albumRedirectTracks = allTracks.map(t => ({ id: t.id, title: t.title || 'Unknown Track', track_number: t.track_number }));
+        if (_albumRedirectTracks.length === 0) {
+            trackListEl.innerHTML = '<div style="font-size:12px;opacity:0.5;padding:4px;color:#ef4444;">No tracks found for this album.</div>';
+            return;
+        }
+        renderAlbumRedirectTrackList();
+        document.getElementById('album-redirect-form').style.display = 'flex';
+        document.getElementById('album-redirect-ids-input').value = '';
+        document.getElementById('album-redirect-folder-input').value = '';
+        document.getElementById('album-redirect-folder-status').style.display = 'none';
+        albumRedirectValidateCount();
+    } catch(e) {
+        trackListEl.innerHTML = '<div style="font-size:12px;opacity:0.5;padding:4px;color:#ef4444;">Failed to load tracks.</div>';
+    }
+}
+function renderAlbumRedirectTrackList() {
+    const trackListEl = document.getElementById('album-redirect-track-list');
+    trackListEl.innerHTML = _albumRedirectTracks.map((t, i) => `
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;padding:4px 2px;">
+            <div style="opacity:0.4;width:22px;flex-shrink:0;">${t.track_number != null ? t.track_number : (i + 1)}.</div>
+            <div style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${cleanDisplayName(t.title)}</div>
+            <div style="opacity:0.3;font-family:monospace;flex-shrink:0;">${t.id.slice(0,6)}…</div>
+            <button onclick="removeAlbumRedirectTrack(${i})" title="Remove from this batch" style="background:none;border:none;color:#ef4444;opacity:0.6;cursor:pointer;flex-shrink:0;padding:2px 4px;"><i class="fa-solid fa-trash"></i></button>
+        </div>`).join('');
+}
+async function removeAlbumRedirectTrack(index) {
+    const t = _albumRedirectTracks[index];
+    if (!t) return;
+    if (!confirm(`Permanently delete "${cleanDisplayName(t.title)}" from the database? This cannot be undone.`)) return;
+    try {
+        const res = await fetch(`${PLAYER_WORKER_URL}/metadata/track/${encodeURIComponent(t.id)}`, {
+            method: 'DELETE',
+            headers: { 'X-Admin-Key': 'penis' }
+        });
+        if (!res.ok) throw new Error('Worker returned ' + res.status);
+    } catch(e) {
+        alert('Failed to delete from database: ' + e.message);
+        return;
+    }
+    _albumRedirectTracks.splice(index, 1);
+    if (_albumRedirectTracks.length === 0) {
+        document.getElementById('album-redirect-track-list').innerHTML = '<div style="font-size:12px;opacity:0.5;padding:4px;color:#ef4444;">No tracks left in this batch.</div>';
+        document.getElementById('album-redirect-form').style.display = 'none';
+        return;
+    }
+    renderAlbumRedirectTrackList();
+    // Remove only the line that corresponded to the deleted track, keep the rest of the pasted IDs intact.
+    const idsInput = document.getElementById('album-redirect-ids-input');
+    const lines = idsInput.value.split('\n');
+    if (lines.length > index) {
+        lines.splice(index, 1);
+        idsInput.value = lines.join('\n');
+    }
+    albumRedirectValidateCount();
+}
+function clearAlbumRedirectSelection() {
+    _albumRedirectTracks = [];
+    document.getElementById('album-redirect-selected').style.display = 'none';
+    document.getElementById('album-redirect-form').style.display = 'none';
+    document.getElementById('album-redirect-ids-input').value = '';
+    document.getElementById('album-redirect-folder-input').value = '';
+    document.getElementById('album-redirect-folder-status').style.display = 'none';
+    document.getElementById('album-redirect-status').style.display = 'none';
+    document.getElementById('album-redirect-progress').style.display = 'none';
+    document.getElementById('album-redirect-progress').innerHTML = '';
+}
+async function albumRedirectFillFromFolder() {
+    const raw = document.getElementById('album-redirect-folder-input').value.trim();
+    const status = document.getElementById('album-redirect-folder-status');
+    const fillBtn = document.getElementById('album-redirect-folder-fill-btn');
+    if (!raw) return;
+    const folderId = extractDriveId(raw);
+    status.textContent = 'Loading folder…';
+    status.style.background = 'color-mix(in srgb,var(--md-sys-color-primary) 10%,transparent)';
+    status.style.display = '';
+    fillBtn.disabled = true;
+    try {
+        // Same ?list= endpoint the rest of the app uses for opening folders — already filters to
+        // audio/video files only and sorts naturally by filename (e.g. "01 - Track.mp3" before "02 - ...").
+        const res = await fetch(`${STREAMING_URL}?list=${folderId}`, { cache: 'no-store' });
+        if (!res.ok) throw new Error('Worker returned ' + res.status);
+        const files = await res.json();
+        if (!Array.isArray(files) || files.length === 0) {
+            throw new Error('No audio files found in that folder');
+        }
+        const trackCount = _albumRedirectTracks.length;
+        if (trackCount > 0 && files.length !== trackCount) {
+            status.textContent = `⚠ Folder has ${files.length} file${files.length === 1 ? '' : 's'}, but this album has ${trackCount} track${trackCount === 1 ? '' : 's'} — filled anyway, double-check order below.`;
+            status.style.background = 'color-mix(in srgb,#f59e0b 18%,transparent)';
+        } else {
+            status.textContent = `✓ Filled ${files.length} ID${files.length === 1 ? '' : 's'} from folder, sorted by filename.`;
+            status.style.background = 'color-mix(in srgb,#22c55e 15%,transparent)';
+        }
+        document.getElementById('album-redirect-ids-input').value = files.map(f => f.id).join('\n');
+        albumRedirectValidateCount();
+    } catch(e) {
+        status.textContent = '✗ Failed: ' + e.message;
+        status.style.background = 'color-mix(in srgb,#ef4444 15%,transparent)';
+    } finally {
+        fillBtn.disabled = false;
+    }
+}
+function albumRedirectValidateCount() {
+    const raw = document.getElementById('album-redirect-ids-input').value;
+    const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    const hint = document.getElementById('album-redirect-count-hint');
+    const submitBtn = document.getElementById('album-redirect-submit-btn');
+    const trackCount = _albumRedirectTracks.length;
+    if (lines.length === 0) {
+        hint.textContent = `Paste ${trackCount} new Drive ID${trackCount === 1 ? '' : 's'}, one per line, in track order.`;
+        hint.style.color = '';
+        submitBtn.disabled = true;
+        return;
+    }
+    if (lines.length !== trackCount) {
+        hint.textContent = `${lines.length} ID${lines.length === 1 ? '' : 's'} pasted, but this album has ${trackCount} track${trackCount === 1 ? '' : 's'} — counts must match exactly.`;
+        hint.style.color = '#ef4444';
+        submitBtn.disabled = true;
+        return;
+    }
+    hint.textContent = `✓ ${lines.length} IDs ready — will map 1:1 to tracks in the order shown above.`;
+    hint.style.color = '#22c55e';
+    submitBtn.disabled = false;
+}
+async function submitAlbumBatchRedirect() {
+    const raw = document.getElementById('album-redirect-ids-input').value;
+    const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    const status = document.getElementById('album-redirect-status');
+    const progress = document.getElementById('album-redirect-progress');
+    const submitBtn = document.getElementById('album-redirect-submit-btn');
+    if (lines.length !== _albumRedirectTracks.length || _albumRedirectTracks.length === 0) {
+        status.textContent = 'ID count does not match track count.';
+        status.style.background = 'color-mix(in srgb,#ef4444 15%,transparent)';
+        status.style.display = '';
+        return;
+    }
+    const pairs = _albumRedirectTracks.map((t, i) => ({ trackId: t.id, title: t.title, newId: extractDriveId(lines[i]) }));
+    submitBtn.disabled = true;
+    status.style.display = 'none';
+    progress.style.display = 'flex';
+    progress.innerHTML = pairs.map((p, i) => `<div id="album-redirect-row-${i}" style="font-size:12px;padding:3px 2px;opacity:0.5;">⏳ ${cleanDisplayName(p.title)}</div>`).join('');
+    let successCount = 0;
+    let failCount = 0;
+    // Sequential, not parallel — keeps load on the Worker/Durable Object predictable and gives clean per-row progress.
+    for (let i = 0; i < pairs.length; i++) {
+        const { trackId, title, newId } = pairs[i];
+        const row = document.getElementById(`album-redirect-row-${i}`);
+        try {
+            const res = await fetch(PLAYER_WORKER_URL + '/redirect', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-Admin-Key': 'penis' },
+                body: JSON.stringify({ from: trackId, to: newId })
+            });
+            if (res.ok) {
+                successCount++;
+                if (row) { row.style.opacity = '0.8'; row.textContent = `✓ ${cleanDisplayName(title)}`; }
+            } else {
+                throw new Error('Worker returned ' + res.status);
+            }
+        } catch(e) {
+            failCount++;
+            if (row) { row.style.opacity = '1'; row.style.color = '#ef4444'; row.textContent = `✗ ${cleanDisplayName(title)} — ${e.message}`; }
+        }
+    }
+    submitBtn.disabled = false;
+    if (failCount === 0) {
+        status.textContent = `✓ Redirected all ${successCount} tracks successfully`;
+        status.style.background = 'color-mix(in srgb,#22c55e 15%,transparent)';
+    } else {
+        status.textContent = `${successCount} succeeded, ${failCount} failed — see rows above`;
+        status.style.background = 'color-mix(in srgb,#ef4444 15%,transparent)';
+    }
+    status.style.display = '';
+}
+// ---------------- Album Lossless Versions ----------------
+let _losslessSearchTimeout = null;
+const _losslessSearchResults = new Map(); // album+artist key -> {album, artist}
+let _losslessTracks = []; // sorted track list for the selected album: [{id, title, track_number}]
+function losslessPanelSearch(query) {
+    clearTimeout(_losslessSearchTimeout);
+    const results = document.getElementById('lossless-search-results');
+    if (!query.trim()) { results.innerHTML = ''; return; }
+    results.innerHTML = '<div style="font-size:13px;opacity:0.4;padding:8px 4px;">Searching…</div>';
+    _losslessSearchTimeout = setTimeout(async () => {
+        try {
+            const res = await fetch(`${SEARCH_API_URL}/metadata/search/ai`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query })
+            });
+            if (!res.ok) throw new Error(res.status);
+            const data = await res.json();
+            const tracks = data.tracks || [];
+            const albumMap = new Map();
+            tracks.forEach(t => {
+                const album = t.album || '';
+                if (!album) return;
+                const artist = t.album_artist || t.artist || '';
+                const key = album.toLowerCase() + '|' + artist.toLowerCase();
+                if (!albumMap.has(key)) albumMap.set(key, { album, artist, count: 0 });
+                albumMap.get(key).count++;
+            });
+            const albums = Array.from(albumMap.entries()).slice(0, 20);
+            if (albums.length === 0) {
+                results.innerHTML = '<div style="font-size:13px;opacity:0.4;padding:8px 4px;">No results</div>';
+                return;
+            }
+            _losslessSearchResults.clear();
+            albums.forEach(([key, info]) => _losslessSearchResults.set(key, info));
+            results.innerHTML = albums.map(([key, info]) => `
+                <div data-lossless-key="${key}"
+                    style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;background:color-mix(in srgb,var(--md-sys-color-surface-variant) 40%,transparent);transition:background 0.15s;">
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${cleanDisplayName(info.album)}</div>
+                        <div style="font-size:11px;opacity:0.55;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${info.artist}</div>
+                    </div>
+                    <div style="font-size:11px;opacity:0.4;">${info.count} track${info.count === 1 ? '' : 's'}</div>
+                </div>`).join('');
+            results.querySelectorAll('[data-lossless-key]').forEach(el => {
+                el.addEventListener('click', () => {
+                    const info = _losslessSearchResults.get(el.dataset.losslessKey);
+                    if (info) losslessSelectAlbum(info.album, info.artist);
+                });
+            });
+        } catch(e) {
+            results.innerHTML = '<div style="font-size:13px;opacity:0.4;padding:8px 4px;">Search failed</div>';
+        }
+    }, 350);
+}
+async function losslessSelectAlbum(album, artist) {
+    const status = document.getElementById('lossless-status');
+    status.style.display = 'none';
+    document.getElementById('lossless-search-results').innerHTML = '';
+    document.getElementById('lossless-search-input').value = '';
+    document.getElementById('lossless-selected-title').textContent = cleanDisplayName(album);
+    document.getElementById('lossless-selected-artist').textContent = artist;
+    const trackListEl = document.getElementById('lossless-track-list');
+    trackListEl.innerHTML = '<div style="font-size:12px;opacity:0.4;padding:4px;">Loading tracks…</div>';
+    document.getElementById('lossless-selected').style.display = '';
+    document.getElementById('lossless-form').style.display = 'none';
+    try {
+        const params = new URLSearchParams({ album, artist: artist || '' });
+        const res = await fetch(`${SEARCH_API_URL}/metadata/album-tracks?${params}`);
+        const data = await res.json();
+        const allTracks = data.tracks || [];
+        _losslessTracks = allTracks.map(t => ({ id: t.id, title: t.title || 'Unknown Track', track_number: t.track_number }));
+        if (_losslessTracks.length === 0) {
+            trackListEl.innerHTML = '<div style="font-size:12px;opacity:0.5;padding:4px;color:#ef4444;">No tracks found for this album.</div>';
+            return;
+        }
+        renderLosslessTrackList();
+        document.getElementById('lossless-form').style.display = 'flex';
+        document.getElementById('lossless-ids-input').value = '';
+        document.getElementById('lossless-folder-input').value = '';
+        document.getElementById('lossless-folder-status').style.display = 'none';
+        losslessValidateCount();
+    } catch(e) {
+        trackListEl.innerHTML = '<div style="font-size:12px;opacity:0.5;padding:4px;color:#ef4444;">Failed to load tracks.</div>';
+    }
+}
+function renderLosslessTrackList() {
+    const trackListEl = document.getElementById('lossless-track-list');
+    trackListEl.innerHTML = _losslessTracks.map((t, i) => `
+        <div style="display:flex;align-items:center;gap:8px;font-size:12px;padding:4px 2px;">
+            <div style="opacity:0.4;width:22px;flex-shrink:0;">${t.track_number != null ? t.track_number : (i + 1)}.</div>
+            <div style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${cleanDisplayName(t.title)}</div>
+            <div style="opacity:0.3;font-family:monospace;flex-shrink:0;">${t.id.slice(0,6)}…</div>
+        </div>`).join('');
+}
+function clearLosslessSelection() {
+    _losslessTracks = [];
+    document.getElementById('lossless-selected').style.display = 'none';
+    document.getElementById('lossless-form').style.display = 'none';
+    document.getElementById('lossless-ids-input').value = '';
+    document.getElementById('lossless-folder-input').value = '';
+    document.getElementById('lossless-folder-status').style.display = 'none';
+    document.getElementById('lossless-status').style.display = 'none';
+    document.getElementById('lossless-progress').style.display = 'none';
+    document.getElementById('lossless-progress').innerHTML = '';
+}
+async function losslessFillFromFolder() {
+    const raw = document.getElementById('lossless-folder-input').value.trim();
+    const status = document.getElementById('lossless-folder-status');
+    const fillBtn = document.getElementById('lossless-folder-fill-btn');
+    if (!raw) return;
+    const folderId = extractDriveId(raw);
+    status.textContent = 'Loading folder…';
+    status.style.background = 'color-mix(in srgb,var(--md-sys-color-primary) 10%,transparent)';
+    status.style.display = '';
+    fillBtn.disabled = true;
+    try {
+        // Same ?list= endpoint used elsewhere — works for a folder of lossless
+        // files (FLAC/WAV/ALAC) just as well as it does for mp3s, sorted by filename.
+        const res = await fetch(`${STREAMING_URL}?list=${folderId}`, { cache: 'no-store' });
+        if (!res.ok) throw new Error('Worker returned ' + res.status);
+        const files = await res.json();
+        if (!Array.isArray(files) || files.length === 0) {
+            throw new Error('No audio files found in that folder');
+        }
+        const trackCount = _losslessTracks.length;
+        if (trackCount > 0 && files.length !== trackCount) {
+            status.textContent = `⚠ Folder has ${files.length} file${files.length === 1 ? '' : 's'}, but this album has ${trackCount} track${trackCount === 1 ? '' : 's'} — filled anyway, double-check order below.`;
+            status.style.background = 'color-mix(in srgb,#f59e0b 18%,transparent)';
+        } else {
+            status.textContent = `✓ Filled ${files.length} ID${files.length === 1 ? '' : 's'} from folder, sorted by filename.`;
+            status.style.background = 'color-mix(in srgb,#22c55e 15%,transparent)';
+        }
+        document.getElementById('lossless-ids-input').value = files.map(f => f.id).join('\n');
+        losslessValidateCount();
+    } catch(e) {
+        status.textContent = '✗ Failed: ' + e.message;
+        status.style.background = 'color-mix(in srgb,#ef4444 15%,transparent)';
+    } finally {
+        fillBtn.disabled = false;
+    }
+}
+function losslessValidateCount() {
+    const raw = document.getElementById('lossless-ids-input').value;
+    const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    const hint = document.getElementById('lossless-count-hint');
+    const submitBtn = document.getElementById('lossless-submit-btn');
+    const trackCount = _losslessTracks.length;
+    if (lines.length === 0) {
+        hint.textContent = `Paste ${trackCount} lossless Drive ID${trackCount === 1 ? '' : 's'}, one per line, in track order.`;
+        hint.style.color = '';
+        submitBtn.disabled = true;
+        return;
+    }
+    if (lines.length !== trackCount) {
+        hint.textContent = `${lines.length} ID${lines.length === 1 ? '' : 's'} pasted, but this album has ${trackCount} track${trackCount === 1 ? '' : 's'} — counts must match exactly.`;
+        hint.style.color = '#ef4444';
+        submitBtn.disabled = true;
+        return;
+    }
+    hint.textContent = `✓ ${lines.length} IDs ready — will map 1:1 to tracks in the order shown above.`;
+    hint.style.color = '#22c55e';
+    submitBtn.disabled = false;
+}
+async function submitAlbumLossless() {
+    const raw = document.getElementById('lossless-ids-input').value;
+    const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    const status = document.getElementById('lossless-status');
+    const progress = document.getElementById('lossless-progress');
+    const submitBtn = document.getElementById('lossless-submit-btn');
+    if (lines.length !== _losslessTracks.length || _losslessTracks.length === 0) {
+        status.textContent = 'ID count does not match track count.';
+        status.style.background = 'color-mix(in srgb,#ef4444 15%,transparent)';
+        status.style.display = '';
+        return;
+    }
+    const pairs = _losslessTracks.map((t, i) => ({ trackId: t.id, title: t.title, newId: extractDriveId(lines[i]) }));
+    submitBtn.disabled = true;
+    status.style.display = 'none';
+    progress.style.display = 'flex';
+    progress.innerHTML = pairs.map((p, i) => `<div id="lossless-row-${i}" style="font-size:12px;padding:3px 2px;opacity:0.5;">⏳ ${cleanDisplayName(p.title)}</div>`).join('');
+    let successCount = 0;
+    let failCount = 0;
+    // Sequential, not parallel — keeps load on the Worker/Durable Object predictable and gives clean per-row progress.
+    for (let i = 0; i < pairs.length; i++) {
+        const { trackId, title, newId } = pairs[i];
+        const row = document.getElementById(`lossless-row-${i}`);
+        try {
+            const res = await fetch(PLAYER_WORKER_URL + '/lossless', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'X-Admin-Key': 'penis' },
+                body: JSON.stringify({ from: trackId, to: newId })
+            });
+            if (res.ok) {
+                successCount++;
+                if (row) { row.style.opacity = '0.8'; row.textContent = `✓ ${cleanDisplayName(title)}`; }
+            } else {
+                throw new Error('Worker returned ' + res.status);
+            }
+        } catch(e) {
+            failCount++;
+            if (row) { row.style.opacity = '1'; row.style.color = '#ef4444'; row.textContent = `✗ ${cleanDisplayName(title)} — ${e.message}`; }
+        }
+    }
+    submitBtn.disabled = false;
+    if (failCount === 0) {
+        status.textContent = `✓ Added lossless versions for all ${successCount} tracks`;
+        status.style.background = 'color-mix(in srgb,#22c55e 15%,transparent)';
+    } else {
+        status.textContent = `${successCount} succeeded, ${failCount} failed — see rows above`;
+        status.style.background = 'color-mix(in srgb,#ef4444 15%,transparent)';
+    }
+    status.style.display = '';
 }
 let _artRedirectSelectedFile = null;   // File object from the picker
 let _artRedirectCheckTimer   = null;   // Debounce timer for existing-redirect check
@@ -29220,10 +30014,14 @@ async function driveVideoLoad(fileId) {
     const npArtistEl = document.getElementById('npArtist');
     if (npTitleEl) npTitleEl.textContent = cleanDisplayName(title);
     if (npArtistEl) npArtistEl.textContent = artist;
-    const deTitleEl = document.getElementById('deTitle');
+    const deTitleEl = document.getElementById('deTitleText');
     const deArtistEl = document.getElementById('deArtist');
     if (deTitleEl) deTitleEl.textContent = cleanDisplayName(title);
     if (deArtistEl) deArtistEl.textContent = artist;
+    const npLosslessBadgeEl = document.getElementById('npLosslessBadge');
+    const deLosslessBadgeEl = document.getElementById('deLosslessBadge');
+    if (npLosslessBadgeEl) npLosslessBadgeEl.style.display = 'none';
+    if (deLosslessBadgeEl) deLosslessBadgeEl.style.display = 'none';
     document.body.classList.add('playing');
     videoEl.addEventListener('canplay', () => {
         if (spinner) spinner.style.display = 'none';
@@ -31731,6 +32529,28 @@ function initNormalizationAudio() {
     return null;
 }
 /**
+ * Toggle the global "prefer lossless streaming" preference on/off.
+ * If a track is currently loaded, re-points the active player at the
+ * correct-quality source in place, preserving playback position.
+ */
+function toggleLosslessPreference() {
+    const toggle = document.getElementById('losslessToggle');
+    const enabled = toggle.checked;
+    localStorage.setItem('goot_prefer_lossless', enabled.toString());
+    if (typeof showShareToast === 'function') {
+        showShareToast(enabled ? 'Lossless streaming preferred when available' : 'Lossless streaming disabled', 'success');
+    }
+    const audioEl = typeof currentPlayer !== 'undefined' ? currentPlayer : null;
+    const trackId = (typeof queue !== 'undefined' && queue[qIndex]) ? queue[qIndex].id : null;
+    if (audioEl && trackId && !audioEl.src.startsWith('blob:')) {
+        const wasPlaying = !audioEl.paused;
+        const resumeAt = audioEl.currentTime || 0;
+        audioEl.src = streamUrl(trackId);
+        audioEl.currentTime = resumeAt;
+        if (wasPlaying) audioEl.play().catch(() => {});
+    }
+}
+/**
  * Toggle volume normalization on/off
  */
 function toggleNormalization() {
@@ -31962,7 +32782,7 @@ async function analyzeAndApplyNormalization(trackId) {
         return;
     }
     const audioEl = currentPlayer;
-    const expectedSrc = `${STREAMING_URL}?id=${trackId}`;
+    const expectedSrc = streamUrl(trackId);
     const isCurrentlyStreaming = audioEl && audioEl.src === expectedSrc && audioEl.readyState < 4;
     if (isCurrentlyStreaming && !completedTrackBuffers.has(trackId) && !pendingWorkerFetches.has(trackId)) {
         await new Promise(resolve => {
@@ -34830,7 +35650,7 @@ async function importAllData(input) {
                         clearRequest.onsuccess = () => resolve();
                     });
                     for (const item of importData.indexedDB.trackMetadata) {
-                        item.metadataVersion = 'metadata-store-v15';
+                        item.metadataVersion = METADATA_STORE_VERSION;
                         store.put(item);
                     }
                     await new Promise((resolve) => {
@@ -35452,7 +36272,7 @@ player.onended = () => {
         _blobUrlsBlocked = true;
         const currentTrack = queue[qIndex];
         if (currentTrack) {
-            player.src = STREAMING_URL + "?id=" + currentTrack.id;
+            player.src = streamUrl(currentTrack.id);
             player.currentTime = currentTime;
             player.play().catch(err => console.error('Retry playback error:', err));
         }
@@ -35520,7 +36340,7 @@ player2.onended = () => {
         _blobUrlsBlocked = true;
         const currentTrack = queue[qIndex];
         if (currentTrack) {
-            player2.src = STREAMING_URL + "?id=" + currentTrack.id;
+            player2.src = streamUrl(currentTrack.id);
             player2.currentTime = currentTime;
             player2.play().catch(err => console.error('Retry playback error:', err));
         }
@@ -35590,7 +36410,7 @@ player.onerror = function() {
             if (currentTrack) {
                 const wasPlaying = !player.paused;
                 const savedTime = player.currentTime || 0;
-                player.src = STREAMING_URL + "?id=" + currentTrack.id;
+                player.src = streamUrl(currentTrack.id);
                 if (savedTime > 0) {
                     player.currentTime = savedTime;
                 }
@@ -35613,7 +36433,7 @@ player2.onerror = function() {
             if (currentTrack) {
                 const wasPlaying = !player2.paused;
                 const savedTime = player2.currentTime || 0;
-                player2.src = STREAMING_URL + "?id=" + currentTrack.id;
+                player2.src = streamUrl(currentTrack.id);
                 if (savedTime > 0) {
                     player2.currentTime = savedTime;
                 }
@@ -36281,6 +37101,7 @@ function renderAlbumAsFolderView(album, tracks) {
         coverLabelEl.textContent = 'Album';
         coverTitleEl.textContent = album.album || 'Unknown Album';
         coverMetaEl.textContent = album.artist || '';
+        updateAlbumViewLosslessBadge(tracks);
         const cachedArt = albumArtCache[album.album] || album.albumArt;
         if (cachedArt) {
             const img = new Image();
@@ -37245,13 +38066,17 @@ function clearQueue() {
     if (fsArtist) fsArtist.textContent = 'Select music';
     if (fsAlbum) fsAlbum.textContent = '—';
     if (fsArt) _fsArtSetHTML('<i class="fa-solid fa-music" style="opacity:0.35;font-size:48px;"></i>');
-    const deTitle = document.getElementById('deTitle');
+    const deTitle = document.getElementById('deTitleText');
     const deArtist = document.getElementById('deArtist');
     const deArt = document.getElementById('deArt');
     const deArtImg = document.getElementById('desktopExtendedArtImg');
     const deBg = document.getElementById('desktopExtendedArtBg');
     if (deTitle) deTitle.textContent = 'No Track';
     if (deArtist) deArtist.textContent = 'Select music';
+    const npLosslessBadgeReset = document.getElementById('npLosslessBadge');
+    const deLosslessBadgeReset = document.getElementById('deLosslessBadge');
+    if (npLosslessBadgeReset) npLosslessBadgeReset.style.display = 'none';
+    if (deLosslessBadgeReset) deLosslessBadgeReset.style.display = 'none';
     if (deArt) deArt.innerHTML = '<i class="fa-solid fa-music" style="opacity:0.35;font-size:28px;"></i>';
     if (deArtImg) {
         deArtImg.src = '';
@@ -43757,7 +44582,7 @@ document.querySelector('.player-bar')?.addEventListener('click', function(e) {
 function openMobileExpandedDrawer(type) {
     if (window.innerWidth > 768) return;
     const art = document.getElementById('desktopExtendedArtImg');
-    const title = document.getElementById('deTitle');
+    const title = document.getElementById('deTitleText');
     const artist = document.getElementById('deArtist');
     if (type === 'upnext') {
         const drawer = document.getElementById('mobileUpNextDrawer');
@@ -43935,11 +44760,25 @@ const SETTINGS_SECTIONS = {
     panel: 'settings-panel-redirect',
     secret: true
   },
+  'album-redirect': {
+    title: 'Album Batch Redirect',
+    sub: 'Redirect every track on an album at once',
+    icon: '<i class="fa-solid fa-layer-group"></i>',
+    panel: 'settings-panel-album-redirect',
+    secret: true
+  },
   'art-redirect': {
     title: 'Album Art Redirects',
     sub: 'Replace album art with a new upload',
     icon: '<i class="fa-solid fa-image"></i>',
     panel: 'settings-panel-art-redirect',
+    secret: true
+  },
+  'lossless': {
+    title: 'Album Lossless Versions',
+    sub: 'Add lossless Drive IDs for every track on an album at once',
+    icon: '<i class="fa-solid fa-gem"></i>',
+    panel: 'settings-panel-lossless',
     secret: true
   },
   'folder-map': {
