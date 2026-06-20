@@ -3952,7 +3952,8 @@
 			border-radius: 999px;
 			margin-left: 6px;
 			vertical-align: middle;
-			opacity: 0.85;
+			opacity: 0;
+			transition: opacity 0.4s ease;
 		}
 		.single-duration {
 			font-size: 11px;
@@ -13349,10 +13350,10 @@
 								style="font-size:38px;font-weight:700;letter-spacing:-0.5px;line-height:1.1;word-break:break-word;">
 							</div>
 							<div id="folderCoverMeta" style="font-size:20px;opacity:0.7;margin-top:2px;font-weight:500;"></div>
-							<div id="folderCoverReleaseDate" style="font-size:14px;opacity:0;margin-top:2px;letter-spacing:0.3px;min-height:1em;"></div>
+							<div id="folderCoverReleaseDate" style="font-size:14px;opacity:0;transition:opacity 0.4s ease;margin-top:2px;letter-spacing:0.3px;min-height:1em;"></div>
 							<div style="display:flex;align-items:center;gap:10px;">
 								<div id="folderCoverDuration" style="font-size:14px;opacity:0;margin-top:2px;letter-spacing:0.3px;min-height:1em;"></div>
-								<div id="folderCoverLossless" style="display:none;"><span class="lossless-badge lossless-badge-lg"><i class="fa-solid fa-gem"></i><span id="folderCoverLosslessText">Lossless</span></span></div>
+								<div id="folderCoverLossless" style="opacity:0;transition:opacity 0.4s ease;"><span class="lossless-badge lossless-badge-lg"><i class="fa-solid fa-gem"></i><span id="folderCoverLosslessText">Lossless</span></span></div>
 							</div>
 						</div>
 						<div id="folderCoverActions"
@@ -15311,18 +15312,18 @@ async function updateAlbumViewLosslessBadge(tracks) {
     const textEl = document.getElementById('folderCoverLosslessText');
     if (!wrap || !textEl) return;
     const ids = (tracks || []).map(t => t.id).filter(Boolean);
-    if (!ids.length) { wrap.style.display = 'none'; return; }
+    if (!ids.length) { wrap.style.opacity = '0'; return; }
     try {
         const result = await checkLosslessAvailability(ids);
         const availableCount = ids.filter(id => result[id]).length;
         if (availableCount === 0) {
-            wrap.style.display = 'none';
+            wrap.style.opacity = '0';
             return;
         }
         textEl.textContent = availableCount >= ids.length ? 'Lossless' : `Lossless (${availableCount}/${ids.length})`;
-        wrap.style.display = '';
+        wrap.style.opacity = '1';
     } catch (e) {
-        wrap.style.display = 'none';
+        wrap.style.opacity = '0';
     }
 }
 /**
@@ -15338,7 +15339,7 @@ async function populateSongRowLosslessBadges(tracks) {
         ids.forEach(id => {
             if (!result[id]) return;
             const badge = document.getElementById(`lossless-row-${id}`);
-            if (badge) badge.style.display = 'inline-block';
+            if (badge) badge.style.opacity = '0.85';
         });
     } catch (e) { /* lossless check failed — badges just stay hidden */ }
 }
@@ -20471,6 +20472,8 @@ async function loadFolders(id, refresh = false) {
     }
     const _rdEl = document.getElementById('folderCoverReleaseDate');
     if (_rdEl) { _rdEl.style.transition = 'none'; _rdEl.style.opacity = '0'; _rdEl.textContent = ''; requestAnimationFrame(() => { _rdEl.style.transition = ''; }); }
+    const _clEl = document.getElementById('folderCoverLossless');
+    if (_clEl) { _clEl.style.transition = 'none'; _clEl.style.opacity = '0'; requestAnimationFrame(() => { _clEl.style.transition = ''; }); }
     const _wasAlbumView = document.getElementById('library-screen')?.classList.contains('album-view');
     if (_wasAlbumView) grid.style.display = 'none';
     const _ls = document.getElementById('library-screen');
@@ -22020,7 +22023,7 @@ function renderTrackTable(tracks, container, isPlaylist = false, pName = "", ani
                 <\!-- Title + artist -->
                 <td style="padding:10px 12px;">
                     <div class="song-row-info">
-                        <div class="song-row-title meta-title">${m.title}${(t._isVideo || m._isVideo) ? ' <span class="song-row-video-badge"><i class="fa-solid fa-film" style="font-size:8px;margin-right:2px;"></i>VIDEO</span>' : ''}<span class="song-row-lossless-badge" id="lossless-row-${t.id}" style="display:none;"><i class="fa-solid fa-gem" style="font-size:8px;margin-right:2px;"></i>LOSSLESS</span></div>
+                        <div class="song-row-title meta-title">${m.title}${(t._isVideo || m._isVideo) ? ' <span class="song-row-video-badge"><i class="fa-solid fa-film" style="font-size:8px;margin-right:2px;"></i>VIDEO</span>' : ''}<span class="song-row-lossless-badge" id="lossless-row-${t.id}"><i class="fa-solid fa-gem" style="font-size:8px;margin-right:2px;"></i>LOSSLESS</span></div>
                         <div class="song-row-artist meta-artist" data-artist-tag="${(m.artist||'').replace(/"/g,'&quot;')}" title="Go to artist folder">${renderArtistSpansSync(m.artist||'')}</div>
                     </div>
                 </td>
