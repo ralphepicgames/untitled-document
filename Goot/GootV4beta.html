@@ -13077,8 +13077,11 @@ background: transparent !important; border: none !important; box-shadow: none !i
 <span class="selection-count" id="selectionCount">0 selected</span>
 </div>
 <div class="selection-bar-actions">
-<button class="selection-action-btn" data-tooltip="Add to Queue" onclick="addSelectedToQueue()">
-<i class="fas fa-list"></i>
+<button class="selection-action-btn" data-tooltip="Play Next" onclick="addSelectedToQueue('next')">
+<i class="fas fa-circle-up"></i>
+</button>
+<button class="selection-action-btn" data-tooltip="Play Last" onclick="addSelectedToQueue('last')">
+<i class="fas fa-circle-down"></i>
 </button>
 <button class="selection-action-btn" data-tooltip="Add to Playlist" onclick="addSelectedToPlaylist()">
 <i class="fas fa-plus"></i>
@@ -13189,9 +13192,13 @@ style="position:fixed;inset:0;background:rgba(0,0,0,0.8);display:none;align-item
 <div class="share-act-icon"><i class="fa-solid fa-share-nodes"></i></div>
 <span class="share-act-label">Share…</span>
 </button>
-<button class="share-act-btn" onclick="addToQueue_fromShare()">
-<div class="share-act-icon"><i class="fa-solid fa-list-ul"></i></div>
-<span class="share-act-label">Add to Queue</span>
+<button class="share-act-btn" onclick="addToQueue_fromShare('next')">
+<div class="share-act-icon"><i class="fa-solid fa-circle-up"></i></div>
+<span class="share-act-label">Play Next</span>
+</button>
+<button class="share-act-btn" onclick="addToQueue_fromShare('last')">
+<div class="share-act-icon"><i class="fa-solid fa-circle-down"></i></div>
+<span class="share-act-label">Play Last</span>
 </button>
 <button class="share-act-btn" id="npCardBtn" onclick="generateNowPlayingCard()" style="grid-column:1/-1;">
 <div class="share-act-icon"><i class="fa-solid fa-image"></i></div>
@@ -21829,9 +21836,13 @@ menuHTML += `
 `;
 }
 menuHTML += `
-<button class="popover-item" onclick="closeTrackActionsPopover(); addToQueue('${trackId}')">
-<i class="fa-solid fa-list"></i>
-<span>Add to Queue</span>
+<button class="popover-item" onclick="closeTrackActionsPopover(); playNext('${trackId}')">
+<i class="fa-solid fa-circle-up"></i>
+<span>Play Next</span>
+</button>
+<button class="popover-item" onclick="closeTrackActionsPopover(); playLast('${trackId}')">
+<i class="fa-solid fa-circle-down"></i>
+<span>Play Last</span>
 </button>
 `;
 if (isPlaylist) {
@@ -24644,15 +24655,22 @@ await navigator.share({ title: `GootV4 – ${title}`, text: token });
 copyShareCode();
 }
 }
-function addToQueue_fromShare() {
+function addToQueue_fromShare(mode = 'last') {
 if (!currentShareTrackId) return;
 const existing = allTracks.find(t => t.id === currentShareTrackId) || queue.find(t => t.id === currentShareTrackId);
 if (existing) {
 if (!queue.find(t => t.id === currentShareTrackId)) {
+if (mode === 'next') {
+queue.splice(qIndex + 1, 0, existing);
+showShareToast('Plays next!');
+} else {
 queue.push(existing);
-renderQueue();
+showShareToast('Added to end of queue!');
 }
-showShareToast('Added to queue!');
+renderQueue();
+} else {
+showShareToast(mode === 'next' ? 'Plays next!' : 'Added to queue!');
+}
 } else {
 playTrackById(currentShareTrackId);
 showShareToast('Loading track into queue…');
@@ -28314,6 +28332,27 @@ const results = document.getElementById("searchResults");
 results.classList.remove("visible");
 results.style.display = "none";
 });
+function playNext(trackId) {
+const m = trackMetadata[trackId];
+const track = { id: trackId, title: m?.title || 'Unknown Track', artist: m?.artist || 'Unknown Artist', album: m?.album || '', albumArt: m?.albumArt };
+const insertAt = qIndex + 1;
+queue.splice(insertAt, 0, track);
+showNotification(`"${track.title}" plays next`);
+const trackRow = document.getElementById(`row-${trackId}`);
+if (trackRow) { trackRow.style.background = 'var(--md-sys-color-primary-container)'; setTimeout(() => { trackRow.style.background = ''; }, 300); }
+setTimeout(() => renderQueue(), 0);
+if (partyState && partyState.active && partyState.role === 'host') pushPartyState();
+}
+function playLast(trackId) {
+const m = trackMetadata[trackId];
+const track = { id: trackId, title: m?.title || 'Unknown Track', artist: m?.artist || 'Unknown Artist', album: m?.album || '', albumArt: m?.albumArt };
+queue.push(track);
+showNotification(`"${track.title}" added to end of queue`);
+const trackRow = document.getElementById(`row-${trackId}`);
+if (trackRow) { trackRow.style.background = 'var(--md-sys-color-primary-container)'; setTimeout(() => { trackRow.style.background = ''; }, 300); }
+setTimeout(() => renderQueue(), 0);
+if (partyState && partyState.active && partyState.role === 'host') pushPartyState();
+}
 function addToQueue(trackId) {
 const m = trackMetadata[trackId];
 queue.push({
@@ -37254,8 +37293,11 @@ ${track.thumbnailLink
 ${track.album ? `<div class="top-search-result-album">${highlightMatch(cleanDisplayName(track.album), query)}</div>` : ''}
 </div>
 <div class="top-search-result-actions">
-<button class="top-search-result-action-btn" onclick="event.stopPropagation(); addToQueue('${track.id || ''}')" title="Add to Queue">
-<i class="fa-solid fa-list" style="font-size:14px;"></i>
+<button class="top-search-result-action-btn" onclick="event.stopPropagation(); playNext('${track.id || ''}')" title="Play Next">
+<i class="fa-solid fa-circle-up" style="font-size:14px;"></i>
+</button>
+<button class="top-search-result-action-btn" onclick="event.stopPropagation(); playLast('${track.id || ''}')" title="Play Last">
+<i class="fa-solid fa-circle-down" style="font-size:14px;"></i>
 </button>
 <button class="top-search-result-action-btn" onclick="event.stopPropagation(); openPlaylistModal(event, '${track.id || ''}')" title="Add to Playlist">
 <i class="fa-solid fa-bookmark" style="font-size:14px;"></i>
@@ -38879,24 +38921,27 @@ item.classList.remove('selected');
 });
 updateSelectionBar();
 }
-function addSelectedToQueue() {
+function addSelectedToQueue(mode = 'last') {
 if (selectedTracks.size === 0) return;
 const tracksToAdd = Array.from(selectedTracks);
 let addedCount = 0;
-tracksToAdd.forEach(trackId => {
+if (mode === 'next') {
+// Insert in reverse order so they end up in original order after current track
+[...tracksToAdd].reverse().forEach(trackId => {
 const m = trackMetadata[trackId] || {};
-queue.push({
-id: trackId,
-title: m.title || 'Unknown Track',
-artist: m.artist || 'Unknown Artist',
-album: m.album || '',
-albumArt: m.albumArt
-});
+queue.splice(qIndex + 1, 0, { id: trackId, title: m.title || 'Unknown Track', artist: m.artist || 'Unknown Artist', album: m.album || '', albumArt: m.albumArt });
 addedCount++;
 });
+} else {
+tracksToAdd.forEach(trackId => {
+const m = trackMetadata[trackId] || {};
+queue.push({ id: trackId, title: m.title || 'Unknown Track', artist: m.artist || 'Unknown Artist', album: m.album || '', albumArt: m.albumArt });
+addedCount++;
+});
+}
 if (addedCount > 0) {
 renderQueue();
-showNotification(`Added ${addedCount} track(s) to queue!`);
+showNotification(mode === 'next' ? `${addedCount} track(s) playing next!` : `${addedCount} track(s) added to end of queue!`);
 clearSelection();
 }
 }
