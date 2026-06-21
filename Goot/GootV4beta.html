@@ -13309,6 +13309,10 @@ d="M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.6 12 3.6 12 3.6s-7.5 0-9.4.5A3 3 0 0 0 .5 
 </svg></div>
 <div class="nav-label">YouTube</div>
 </div>
+<div class="nav-item" data-screen="charts" onclick="nav(this); _initChartsIfNeeded()">
+<div class="nav-icon-wrapper"><i class="fa-solid fa-trophy"></i></div>
+<div class="nav-label">Charts</div>
+</div>
 <div class="nav-item" data-screen="settings" style="margin-top:auto;" onclick="nav(this); _settingsClickEgg()">
 <div class="nav-icon-wrapper"><i class="fa-solid fa-cog"></i></div>
 <div class="nav-label">Settings</div>
@@ -14962,6 +14966,1253 @@ style="width:0%"></div>
 </div>
 </div>
 <input type="file" id="offlineZipInput" accept=".zip" style="display:none" onchange="handleOfflineZipLoad(event)">
+
+<!-- ═══════════════════════════════════════════════════════════════
+     GOOT CHARTS SCREEN
+     Fully integrated into GootV4's visual language.
+     Clicking a track calls playTrackById(); clicking an album navigates inline.
+═══════════════════════════════════════════════════════════════ -->
+<style>
+/* ── Charts screen wrapper ────────────────────────────────────── */
+#charts-screen {
+  padding: 0 24px 120px;
+}
+
+/* ── Charts header strip ──────────────────────────────────────── */
+.charts-hero {
+  padding: 28px 0 20px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.charts-hero-left {}
+.charts-hero-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--md-sys-color-primary);
+  margin-bottom: 6px;
+  opacity: 0.8;
+}
+.charts-hero-title {
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: -1.5px;
+  line-height: 1;
+  background: linear-gradient(135deg, var(--md-sys-color-on-background) 40%, var(--md-sys-color-primary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 0;
+}
+.charts-live-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #34d399;
+  background: rgba(52,211,153,0.10);
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1px solid rgba(52,211,153,0.22);
+  flex-shrink: 0;
+  margin-bottom: 4px;
+}
+.charts-live-dot {
+  width: 6px; height: 6px;
+  background: #34d399;
+  border-radius: 50%;
+  animation: charts-pulse 2s infinite;
+}
+@keyframes charts-pulse {
+  0%,100% { opacity:1; transform:scale(1); }
+  50%      { opacity:0.5; transform:scale(0.8); }
+}
+
+/* ── Period tabs + view toggle ────────────────────────────────── */
+.charts-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.charts-period-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--md-sys-color-surface-variant);
+  padding: 4px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--md-sys-color-outline) 30%, transparent);
+}
+.charts-period-btn {
+  padding: 8px 18px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: color-mix(in srgb, var(--md-sys-color-on-surface) 55%, transparent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s var(--motion-standard);
+  font-family: var(--font-fallback);
+  white-space: nowrap;
+}
+.charts-period-btn.active {
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--md-sys-color-primary) 40%, transparent);
+}
+.charts-period-btn:hover:not(.active) {
+  color: var(--md-sys-color-on-surface);
+  background: color-mix(in srgb, var(--md-sys-color-primary) 10%, transparent);
+}
+.charts-view-toggle {
+  display: flex;
+  gap: 4px;
+  background: var(--md-sys-color-surface-variant);
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--md-sys-color-outline) 30%, transparent);
+}
+.charts-view-btn {
+  width: 34px; height: 34px;
+  border: none;
+  background: transparent;
+  color: color-mix(in srgb, var(--md-sys-color-on-surface) 50%, transparent);
+  font-size: 15px;
+  cursor: pointer;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+.charts-view-btn.active {
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+}
+.charts-view-btn:hover:not(.active) {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent);
+}
+
+/* ── Type tabs (Songs / Albums / Artist) ─────────────────────── */
+.charts-type-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 24px;
+  background: var(--md-sys-color-surface-variant);
+  padding: 4px;
+  border-radius: 14px;
+  border: 1px solid color-mix(in srgb, var(--md-sys-color-outline) 25%, transparent);
+}
+.charts-type-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: color-mix(in srgb, var(--md-sys-color-on-surface) 55%, transparent);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s var(--motion-standard);
+  font-family: var(--font-fallback);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+.charts-type-btn.active {
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+}
+.charts-type-btn:hover:not(.active) { color: var(--md-sys-color-on-surface); }
+
+/* ── Type panels ──────────────────────────────────────────────── */
+.charts-panel { display: none; }
+.charts-panel.active { display: block; }
+
+/* ── Podium (top 3) ───────────────────────────────────────────── */
+.charts-podium {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+.charts-podium-item {
+  background: var(--md-sys-color-surface-variant);
+  border: 1px solid color-mix(in srgb, var(--md-sys-color-outline) 25%, transparent);
+  border-radius: 20px;
+  padding: 20px 14px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.18s var(--motion-standard), box-shadow 0.18s var(--motion-standard);
+  cursor: pointer;
+}
+.charts-podium-item:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.3);
+}
+.charts-podium-item.pos-1 {
+  background: linear-gradient(135deg, rgba(201,162,39,0.14) 0%, var(--md-sys-color-surface-variant) 60%);
+  border-color: rgba(201,162,39,0.28);
+}
+.charts-podium-item.pos-2 {
+  background: linear-gradient(135deg, rgba(155,164,180,0.10) 0%, var(--md-sys-color-surface-variant) 60%);
+  border-color: rgba(155,164,180,0.20);
+}
+.charts-podium-item.pos-3 {
+  background: linear-gradient(135deg, rgba(205,127,50,0.10) 0%, var(--md-sys-color-surface-variant) 60%);
+  border-color: rgba(205,127,50,0.20);
+}
+.charts-podium-badge { font-size: 24px; margin-bottom: 10px; }
+.charts-podium-art {
+  width: 72px; height: 72px;
+  border-radius: 14px;
+  margin: 0 auto 10px;
+  overflow: hidden;
+  background: var(--md-sys-color-surface-container-high);
+  position: relative;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+.charts-podium-art img {
+  width: 100%; height: 100%; object-fit: cover;
+  display: block; opacity: 0; transition: opacity 0.3s;
+}
+.charts-podium-art img.gc-loaded { opacity: 1; }
+.charts-podium-art .gc-art-ph {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 26px;
+  color: color-mix(in srgb, var(--md-sys-color-on-surface) 25%, transparent);
+}
+/* hide placeholder when image is loaded */
+.charts-podium-art img.gc-loaded ~ .gc-art-ph { display: none; }
+.charts-podium-play-hint {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.52);
+  opacity: 0; transition: opacity 0.15s;
+  font-size: 18px; border-radius: 14px;
+  color: #fff;
+}
+.charts-podium-item:hover .charts-podium-play-hint { opacity: 1; }
+.charts-podium-title {
+  font-size: 13px; font-weight: 700; letter-spacing: -0.2px;
+  margin-bottom: 3px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: var(--md-sys-color-on-surface);
+}
+.charts-podium-meta {
+  font-size: 12px;
+  color: color-mix(in srgb, var(--md-sys-color-on-surface) 55%, transparent);
+  margin-bottom: 8px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.charts-podium-plays {
+  font-size: 20px; font-weight: 800; letter-spacing: -0.8px;
+  color: var(--md-sys-color-on-surface);
+}
+.charts-podium-plays span {
+  font-size: 11px; font-weight: 500;
+  color: color-mix(in srgb, var(--md-sys-color-on-surface) 40%, transparent);
+  margin-left: 3px; letter-spacing: 0.3px;
+}
+
+/* ── Flat list (rows 4+) ──────────────────────────────────────── */
+.charts-list { display: flex; flex-direction: column; gap: 2px; margin-bottom: 36px; }
+.charts-row {
+  display: grid;
+  grid-template-columns: 40px 48px 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+  border: 1px solid transparent;
+}
+.charts-row:hover {
+  background: var(--md-sys-color-surface-variant);
+  border-color: color-mix(in srgb, var(--md-sys-color-outline) 20%, transparent);
+}
+.charts-row-rank {
+  font-size: 17px; font-weight: 900; text-align: right;
+  font-variant-numeric: tabular-nums; letter-spacing: -0.5px;
+  flex-shrink: 0; min-width: 28px;
+}
+.charts-rank-gold   { color: #c9a227; }
+.charts-rank-silver { color: #9ba4b4; }
+.charts-rank-bronze { color: #cd7f32; }
+.charts-rank-other  { color: color-mix(in srgb, var(--md-sys-color-on-surface) 35%, transparent); font-size: 13px; }
+
+.charts-row-art {
+  width: 48px; height: 48px;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--md-sys-color-surface-container-high);
+  flex-shrink: 0;
+  position: relative;
+}
+.charts-row-art img {
+  width: 100%; height: 100%; object-fit: cover;
+  display: block; opacity: 0; transition: opacity 0.3s;
+}
+.charts-row-art img.gc-loaded { opacity: 1; }
+.charts-row-art .gc-art-ph {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  color: color-mix(in srgb, var(--md-sys-color-on-surface) 25%, transparent);
+}
+.charts-row-art img.gc-loaded ~ .gc-art-ph { display: none; }
+.charts-row-play-hint {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.52);
+  opacity: 0; transition: opacity 0.15s;
+  font-size: 14px; border-radius: 10px; color: #fff;
+}
+.charts-row:hover .charts-row-play-hint { opacity: 1; }
+
+.charts-row-info { min-width: 0; }
+.charts-row-title {
+  font-size: 14px; font-weight: 700;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  letter-spacing: -0.2px;
+  color: var(--md-sys-color-on-surface);
+}
+.charts-row-meta {
+  font-size: 12px;
+  color: color-mix(in srgb, var(--md-sys-color-on-surface) 55%, transparent);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  margin-top: 2px;
+}
+.charts-row-plays { text-align: right; flex-shrink: 0; }
+.charts-row-plays-count {
+  font-size: 15px; font-weight: 800;
+  font-variant-numeric: tabular-nums; letter-spacing: -0.3px;
+  color: var(--md-sys-color-on-surface);
+}
+.charts-row-plays-label {
+  font-size: 10px;
+  color: color-mix(in srgb, var(--md-sys-color-on-surface) 35%, transparent);
+  font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px;
+}
+
+/* ── Grid view ────────────────────────────────────────────────── */
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+  margin-bottom: 36px;
+}
+.charts-grid-item {
+  background: var(--md-sys-color-surface-variant);
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--md-sys-color-outline) 20%, transparent);
+  transition: transform 0.18s var(--motion-standard), box-shadow 0.18s var(--motion-standard);
+  cursor: pointer;
+  position: relative;
+}
+.charts-grid-item:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+}
+.charts-grid-art {
+  width: 100%; aspect-ratio: 1;
+  background: var(--md-sys-color-surface-container-high);
+  position: relative; overflow: hidden;
+}
+.charts-grid-art img {
+  width: 100%; height: 100%; object-fit: cover;
+  display: block; opacity: 0; transition: opacity 0.3s;
+}
+.charts-grid-art img.gc-loaded { opacity: 1; }
+.charts-grid-art .gc-art-ph {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 32px;
+  color: color-mix(in srgb, var(--md-sys-color-on-surface) 20%, transparent);
+}
+.charts-grid-art img.gc-loaded ~ .gc-art-ph { display: none; }
+.charts-grid-rank {
+  position: absolute; top: 8px; left: 8px;
+  font-size: 12px; font-weight: 900;
+  padding: 3px 8px; border-radius: 6px;
+  background: rgba(0,0,0,0.7);
+  backdrop-filter: blur(4px);
+  letter-spacing: -0.3px; color: #fff;
+}
+.charts-grid-rank.rank-gold   { color: #c9a227; }
+.charts-grid-rank.rank-silver { color: #9ba4b4; }
+.charts-grid-rank.rank-bronze { color: #cd7f32; }
+.charts-grid-plays {
+  position: absolute; bottom: 8px; right: 8px;
+  font-size: 11px; font-weight: 700;
+  padding: 3px 7px; border-radius: 6px;
+  background: rgba(0,0,0,0.72);
+  backdrop-filter: blur(4px); color: #fff;
+}
+.charts-grid-play-hint {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.50);
+  opacity: 0; transition: opacity 0.15s;
+  font-size: 22px; color: #fff;
+}
+.charts-grid-item:hover .charts-grid-play-hint { opacity: 1; }
+.charts-grid-info { padding: 10px 12px; }
+.charts-grid-title {
+  font-size: 13px; font-weight: 700;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: var(--md-sys-color-on-surface);
+}
+.charts-grid-meta {
+  font-size: 11px;
+  color: color-mix(in srgb, var(--md-sys-color-on-surface) 50%, transparent);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+/* ── Artist search panel ──────────────────────────────────────── */
+.charts-artist-wrap { position: relative; margin-bottom: 24px; }
+.charts-artist-input {
+  width: 100%;
+  padding: 14px 18px 14px 46px;
+  background: var(--md-sys-color-surface-variant);
+  border: 1px solid color-mix(in srgb, var(--md-sys-color-outline) 30%, transparent);
+  border-radius: 14px;
+  color: var(--md-sys-color-on-surface);
+  font-size: 14px;
+  font-family: var(--font-fallback);
+  font-weight: 500;
+  outline: none;
+  transition: border-color 0.18s, box-shadow 0.18s;
+}
+.charts-artist-input:focus {
+  border-color: var(--md-sys-color-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--md-sys-color-primary) 18%, transparent);
+}
+.charts-artist-input::placeholder {
+  color: color-mix(in srgb, var(--md-sys-color-on-surface) 35%, transparent);
+}
+.charts-artist-icon {
+  position: absolute; left: 16px; top: 50%;
+  transform: translateY(-50%);
+  color: color-mix(in srgb, var(--md-sys-color-on-surface) 40%, transparent);
+  font-size: 15px; pointer-events: none;
+}
+.charts-autocomplete {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+  background: var(--md-sys-color-surface-variant);
+  border: 1px solid color-mix(in srgb, var(--md-sys-color-outline) 30%, transparent);
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+  z-index: 200;
+  max-height: 260px; overflow-y: auto;
+  display: none;
+}
+.charts-autocomplete.open { display: block; }
+.charts-ac-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 14px; cursor: pointer;
+  transition: background 0.12s; font-size: 14px; font-weight: 600;
+  color: var(--md-sys-color-on-surface);
+}
+.charts-ac-item:hover, .charts-ac-item.focused {
+  background: color-mix(in srgb, var(--md-sys-color-primary) 10%, transparent);
+}
+.charts-ac-art {
+  width: 34px; height: 34px; border-radius: 8px;
+  background: var(--md-sys-color-surface-container-high);
+  overflow: hidden; flex-shrink: 0; position: relative;
+}
+.charts-ac-art img { width:100%; height:100%; object-fit:cover; display:block; opacity:0; transition:opacity 0.2s; }
+.charts-ac-art img.gc-loaded { opacity:1; }
+.charts-ac-art .gc-art-ph { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:14px; color:color-mix(in srgb,var(--md-sys-color-on-surface) 25%,transparent); }
+.charts-ac-art img.gc-loaded ~ .gc-art-ph { display:none; }
+.charts-ac-name { flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.charts-ac-count { font-size:11px; color:color-mix(in srgb,var(--md-sys-color-on-surface) 40%,transparent); font-weight:500; flex-shrink:0; }
+
+/* ── Artist detail page ───────────────────────────────────────── */
+#charts-artist-page { display: none; }
+.charts-artist-header {
+  display: flex; align-items: center; gap: 18px;
+  margin-bottom: 28px; padding: 20px;
+  background: var(--md-sys-color-surface-variant);
+  border: 1px solid color-mix(in srgb, var(--md-sys-color-outline) 25%, transparent);
+  border-radius: 20px;
+}
+.charts-artist-art {
+  width: 72px; height: 72px; border-radius: 14px;
+  background: var(--md-sys-color-surface-container-high);
+  overflow: hidden; flex-shrink: 0; position: relative;
+}
+.charts-artist-art img { width:100%; height:100%; object-fit:cover; display:block; opacity:0; transition:opacity 0.3s; }
+.charts-artist-art img.gc-loaded { opacity:1; }
+.charts-artist-art .gc-art-ph { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:28px; color:color-mix(in srgb,var(--md-sys-color-on-surface) 22%,transparent); }
+.charts-artist-art img.gc-loaded ~ .gc-art-ph { display:none; }
+.charts-artist-info { flex:1; min-width:0; }
+.charts-artist-label { font-size:10px; font-weight:700; letter-spacing:2px; text-transform:uppercase; color:var(--md-sys-color-primary); margin-bottom:5px; opacity:0.85; }
+.charts-artist-name { font-size:26px; font-weight:700; letter-spacing:-0.8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--md-sys-color-on-surface); }
+.charts-artist-stats { display:flex; gap:18px; margin-top:6px; flex-wrap:wrap; }
+.charts-artist-stat { font-size:13px; color:color-mix(in srgb,var(--md-sys-color-on-surface) 55%,transparent); }
+.charts-artist-stat strong { color:var(--md-sys-color-on-surface); font-weight:700; }
+
+.charts-split {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start;
+}
+.charts-split-title {
+  font-size: 12px; font-weight: 700; letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--md-sys-color-on-surface) 40%, transparent);
+  margin-bottom: 10px;
+  display: flex; align-items: center; gap: 7px;
+}
+.charts-split-badge {
+  font-size: 11px; font-weight: 600;
+  color: color-mix(in srgb, var(--md-sys-color-on-surface) 40%, transparent);
+  background: var(--md-sys-color-surface-variant);
+  border: 1px solid color-mix(in srgb, var(--md-sys-color-outline) 25%, transparent);
+  border-radius: 20px; padding: 1px 7px;
+  text-transform: none; letter-spacing: 0;
+}
+
+/* ── Skeleton / empty ─────────────────────────────────────────── */
+.charts-skeleton-row {
+  display: grid; grid-template-columns: 40px 48px 1fr auto;
+  align-items: center; gap: 12px; padding: 9px 12px;
+}
+.gc-skel {
+  background: linear-gradient(90deg,
+    var(--md-sys-color-surface-variant) 25%,
+    var(--md-sys-color-surface-container-high) 50%,
+    var(--md-sys-color-surface-variant) 75%);
+  background-size: 200% 100%;
+  animation: gc-shimmer 1.4s infinite;
+  border-radius: 6px;
+}
+@keyframes gc-shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+.charts-empty {
+  text-align: center; padding: 60px 20px;
+  color: color-mix(in srgb, var(--md-sys-color-on-surface) 35%, transparent);
+}
+.charts-empty-icon { font-size: 44px; margin-bottom: 14px; opacity: 0.45; }
+.charts-empty-title { font-size: 17px; font-weight: 700; margin-bottom: 6px; color: color-mix(in srgb, var(--md-sys-color-on-surface) 55%, transparent); }
+.charts-empty-sub { font-size: 13px; }
+
+.charts-section-label {
+  font-size: 11px; font-weight: 700; letter-spacing: 2px;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--md-sys-color-on-surface) 40%, transparent);
+  margin: 0 0 12px 2px;
+}
+.charts-count-label {
+  font-size: 12px;
+  color: color-mix(in srgb, var(--md-sys-color-on-surface) 40%, transparent);
+  font-weight: 500; margin-left: 6px;
+}
+
+@media (max-width: 640px) {
+  .charts-podium { grid-template-columns: 1fr; }
+  .charts-row { grid-template-columns: 32px 40px 1fr auto; gap: 8px; padding: 8px; }
+  .charts-split { grid-template-columns: 1fr; }
+  .charts-controls { flex-direction: column; align-items: flex-start; }
+}
+.gc-fade-in { animation: gc-fade 0.28s ease; }
+@keyframes gc-fade { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+</style>
+
+<div id="charts-screen" class="screen">
+  <!-- Hero -->
+  <div class="charts-hero">
+    <div class="charts-hero-left">
+      <div class="charts-hero-eyebrow">Global Rankings</div>
+      <h1 class="charts-hero-title">🏆 Charts</h1>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div class="charts-live-pill">
+        <div class="charts-live-dot"></div>
+        LIVE
+      </div>
+      <span id="chartsLastUpdated" style="font-size:12px;opacity:0.4;"></span>
+    </div>
+  </div>
+
+  <!-- Period + view controls -->
+  <div class="charts-controls">
+    <div class="charts-period-tabs" role="tablist">
+      <button class="charts-period-btn active" data-period="day"     onclick="gcSetPeriod('day')">Today</button>
+      <button class="charts-period-btn"         data-period="week"    onclick="gcSetPeriod('week')">This Week</button>
+      <button class="charts-period-btn"         data-period="month"   onclick="gcSetPeriod('month')">This Month</button>
+      <button class="charts-period-btn"         data-period="alltime" onclick="gcSetPeriod('alltime')">All Time</button>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <div class="charts-view-toggle">
+        <button class="charts-view-btn active" id="gcViewList" onclick="gcSetView('list')" title="List">☰</button>
+        <button class="charts-view-btn"         id="gcViewGrid" onclick="gcSetView('grid')" title="Grid">⊞</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Type tabs -->
+  <div class="charts-type-tabs" role="tablist">
+    <button class="charts-type-btn active" id="gcTabSongs"  onclick="gcSetType('songs')">🎵 Songs</button>
+    <button class="charts-type-btn"         id="gcTabAlbums" onclick="gcSetType('albums')">💿 Albums</button>
+    <button class="charts-type-btn"         id="gcTabArtist" onclick="gcSetType('artist')">🎤 Artist</button>
+  </div>
+
+  <!-- Songs panel -->
+  <div class="charts-panel active" id="gcPanelSongs">
+    <div class="charts-section-label">Top Songs <span class="charts-count-label" id="gcTrackCount"></span></div>
+    <div id="gcTracksContainer"></div>
+  </div>
+
+  <!-- Albums panel -->
+  <div class="charts-panel" id="gcPanelAlbums">
+    <div class="charts-section-label">Top Albums <span class="charts-count-label" id="gcAlbumCount"></span></div>
+    <div id="gcAlbumsContainer"></div>
+  </div>
+
+  <!-- Artist panel -->
+  <div class="charts-panel" id="gcPanelArtist">
+    <div class="charts-artist-wrap">
+      <span class="charts-artist-icon"><i class="fa-solid fa-magnifying-glass"></i></span>
+      <input class="charts-artist-input" id="gcArtistInput" type="text"
+        placeholder="Search an artist…" autocomplete="off"
+        oninput="gcArtistInput(this.value)"
+        onkeydown="gcArtistKeydown(event)"
+        onfocus="gcArtistFocus()"
+        onblur="gcArtistBlur()">
+      <div class="charts-autocomplete" id="gcAutocomplete"></div>
+    </div>
+
+    <div id="charts-artist-page">
+      <div class="charts-artist-header">
+        <div class="charts-artist-art" id="gcArtistArt">
+          <img id="gcArtistImg" alt="">
+          <div class="gc-art-ph">🎤</div>
+        </div>
+        <div class="charts-artist-info">
+          <div class="charts-artist-label">Artist</div>
+          <div class="charts-artist-name" id="gcArtistName"></div>
+          <div class="charts-artist-stats" id="gcArtistStats"></div>
+        </div>
+      </div>
+      <div class="charts-split">
+        <div>
+          <div class="charts-split-title">🎵 Songs <span class="charts-split-badge" id="gcArtistSongCount"></span></div>
+          <div id="gcArtistSongs"></div>
+        </div>
+        <div>
+          <div class="charts-split-title">💿 Albums <span class="charts-split-badge" id="gcArtistAlbums"></span></div>
+          <div id="gcArtistAlbumsContainer"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════
+   GOOT CHARTS — integrated into GootV4
+   All playback goes through playTrackById(); album navigation
+   via stack.push + loadFolders(); with goHome() guard.
+══════════════════════════════════════════════════════════════════ */
+(function() {
+'use strict';
+
+const GC_WORKER = 'https://gootapimask.goot-api.workers.dev';
+const GC_R2 = GC_WORKER + '/r2/album-art';
+
+// ── State ────────────────────────────────────────────────────────
+let _gcPeriod = 'day';
+let _gcView   = 'list';
+let _gcType   = 'songs';
+let _gcCache  = null;  // { tracks: {day,week,month,alltime}, albums: {...} }
+let _gcTracksData = [];
+let _gcAlbumsData = [];
+let _gcInited = false;
+let _gcWs     = null;
+let _gcWsTimer = null;
+
+// Artist search state
+let _gcAcItems = [];
+let _gcAcIdx   = -1;
+let _gcAcBlur  = null;
+
+// IntersectionObserver for lazy art
+const _gcObs = typeof IntersectionObserver !== 'undefined'
+  ? new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (!e.isIntersecting) return;
+        _gcObs.unobserve(e.target);
+        const { item, isAlbum } = e.target._gcArt || {};
+        if (item) _gcLoadArt(e.target, item, isAlbum);
+      });
+    }, { rootMargin: '200px' })
+  : null;
+
+// ── Public init (called by nav click) ────────────────────────────
+window._initChartsIfNeeded = function() {
+  if (_gcInited) return;
+  _gcInited = true;
+  _gcShowSkeleton();
+  _gcFetchAll();
+  _gcConnectWS();
+};
+
+// ── Period / view / type ─────────────────────────────────────────
+window.gcSetPeriod = function(p) {
+  if (p === _gcPeriod) return;
+  _gcPeriod = p;
+  document.querySelectorAll('.charts-period-btn').forEach(b => b.classList.toggle('active', b.dataset.period === p));
+  _gcSwitchCached();
+};
+window.gcSetView = function(v) {
+  _gcView = v;
+  document.getElementById('gcViewList').classList.toggle('active', v === 'list');
+  document.getElementById('gcViewGrid').classList.toggle('active', v === 'grid');
+  _gcRender();
+};
+window.gcSetType = function(t) {
+  if (t === _gcType) return;
+  _gcType = t;
+  ['songs','albums','artist'].forEach(s => {
+    document.getElementById('gcTab' + s.charAt(0).toUpperCase() + s.slice(1)).classList.toggle('active', t === s);
+    document.getElementById('gcPanel' + s.charAt(0).toUpperCase() + s.slice(1)).classList.toggle('active', t === s);
+  });
+  if (t === 'artist') setTimeout(() => document.getElementById('gcArtistInput')?.focus(), 50);
+  else _gcRender();
+};
+
+// ── Fetch ────────────────────────────────────────────────────────
+async function _gcFetchAll() {
+  try {
+    const [td,tw,tm,ta,ad,aw,am,aa] = await Promise.all([
+      fetch(GC_WORKER+'/charts/tracks?period=day&limit=100').then(r=>r.json()),
+      fetch(GC_WORKER+'/charts/tracks?period=week&limit=100').then(r=>r.json()),
+      fetch(GC_WORKER+'/charts/tracks?period=month&limit=100').then(r=>r.json()),
+      fetch(GC_WORKER+'/charts/tracks?period=alltime&limit=100').then(r=>r.json()),
+      fetch(GC_WORKER+'/charts/albums?period=day&limit=100').then(r=>r.json()),
+      fetch(GC_WORKER+'/charts/albums?period=week&limit=100').then(r=>r.json()),
+      fetch(GC_WORKER+'/charts/albums?period=month&limit=100').then(r=>r.json()),
+      fetch(GC_WORKER+'/charts/albums?period=alltime&limit=100').then(r=>r.json()),
+    ]);
+    _gcCache = {
+      tracks: { day:td.tracks||[], week:tw.tracks||[], month:tm.tracks||[], alltime:ta.tracks||[] },
+      albums: { day:ad.albums||[], week:aw.albums||[], month:am.albums||[], alltime:aa.albums||[] },
+    };
+    _gcTracksData = _gcCache.tracks[_gcPeriod];
+    _gcAlbumsData = _gcCache.albums[_gcPeriod];
+    const lu = document.getElementById('chartsLastUpdated');
+    if (lu) lu.textContent = 'Updated ' + new Date().toLocaleTimeString();
+    _gcRender();
+  } catch(e) {
+    console.error('[GootCharts]', e);
+    const el = document.getElementById('gcTracksContainer');
+    if (el) el.innerHTML = _gcErrorHtml('Could not load charts — check connection');
+  }
+}
+
+function _gcSwitchCached() {
+  if (!_gcCache) { _gcFetchAll(); return; }
+  _gcTracksData = _gcCache.tracks[_gcPeriod] || [];
+  _gcAlbumsData = _gcCache.albums[_gcPeriod] || [];
+  _gcRender();
+}
+
+// ── WebSocket ─────────────────────────────────────────────────────
+function _gcConnectWS() {
+  if (_gcWs && _gcWs.readyState <= 1) return;
+  try {
+    _gcWs = new WebSocket(GC_WORKER.replace('https://','wss://')+'/charts/live');
+    _gcWs.onmessage = e => {
+      try {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'chart-state') {
+          _gcCache = {
+            tracks: { day:msg.dayTracks||[], week:msg.weekTracks||[], month:msg.monthTracks||[], alltime:msg.alltimeTracks||[] },
+            albums: { day:msg.dayAlbums||[], week:msg.weekAlbums||[], month:msg.monthAlbums||[], alltime:msg.alltimeAlbums||[] },
+          };
+          _gcTracksData = _gcCache.tracks[_gcPeriod] || [];
+          _gcAlbumsData = _gcCache.albums[_gcPeriod] || [];
+          const lu = document.getElementById('chartsLastUpdated');
+          if (lu) lu.textContent = 'Live';
+          _gcRender();
+        } else if (msg.type === 'chart-update') {
+          _gcFetchAll();
+        }
+      } catch(_) {}
+    };
+    _gcWs.onclose = () => { _gcWsTimer = setTimeout(_gcConnectWS, 5000); };
+    _gcWs.onerror = () => _gcWs.close();
+  } catch(_) {
+    setInterval(_gcFetchAll, 30000);
+  }
+}
+
+// ── Art loading ───────────────────────────────────────────────────
+function _gcLoadArt(img, item, isAlbum) {
+  const album  = (item.album || '').trim();
+  const artist = (item.artist || '').trim();
+  if (!album) return;
+  const primary = artist.split(/,|&|\bfeat\.?\b/i)[0].trim();
+  const urls = [];
+  if (artist) urls.push(`${GC_R2}/${encodeURIComponent(album)}?${new URLSearchParams({artist})}`);
+  if (primary && primary !== artist) urls.push(`${GC_R2}/${encodeURIComponent(album)}?${new URLSearchParams({artist:primary})}`);
+  urls.push(`${GC_R2}/${encodeURIComponent(album)}`);
+  let done = false;
+  urls.forEach(url => {
+    const probe = new Image();
+    probe.onload = () => {
+      if (done) return;
+      done = true;
+      img.onload = () => img.classList.add('gc-loaded');
+      img.src = url;
+    };
+    probe.src = url;
+  });
+}
+
+// ── Click actions ─────────────────────────────────────────────────
+// Play a track directly inside GootV4
+function _gcPlayTrack(trackId) {
+  if (!trackId) return;
+  if (typeof playTrackById === 'function') {
+    playTrackById(trackId).then(ok => {
+      if (!ok && typeof showShareToast === 'function') showShareToast('Track not found', 'error');
+    });
+  }
+}
+
+// Open an album by name — find it in the folder list and navigate
+async function _gcOpenAlbum(albumName, artistName) {
+  if (!albumName) return;
+  // Delegate directly to GootV4's navigateToRealAlbumFolder, which:
+  // 1. Checks the folder-map cache first (instant if mapped)
+  // 2. Falls back to _npFolderSearch (Drive API lookup)
+  // 3. Builds the correct stack so album-view triggers with breadcrumbs
+  // 4. Shows a toast via showShareToast
+  if (typeof navigateToRealAlbumFolder === 'function') {
+    await navigateToRealAlbumFolder(albumName, artistName || '', null);
+  }
+}
+
+// Helper: get track ID from chart item
+function _gcGetId(item) {
+  return item.id || item.track_id || item.trackId || item.drive_id || item.driveId || item.file_id || null;
+}
+
+// ── Render ────────────────────────────────────────────────────────
+function _gcRender() {
+  _gcRenderSection('gcTracksContainer', _gcTracksData, 'track');
+  _gcRenderSection('gcAlbumsContainer', _gcAlbumsData, 'album');
+  const tc = document.getElementById('gcTrackCount');
+  const ac = document.getElementById('gcAlbumCount');
+  if (tc) tc.textContent = _gcTracksData.length > 0 ? `(${_gcTracksData.length})` : '';
+  if (ac) ac.textContent = _gcAlbumsData.length > 0 ? `(${_gcAlbumsData.length})` : '';
+}
+
+function _gcRenderSection(containerId, data, type) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  if (!data || !data.length) { el.innerHTML = _gcEmptyHtml(); return; }
+  el.innerHTML = _gcView === 'grid' ? _gcBuildGrid(data, type) : _gcBuildList(data, type);
+  el.classList.add('gc-fade-in');
+
+  // Load art
+  const isAlbum = type === 'album';
+  el.querySelectorAll('img[data-gc-idx]').forEach(img => {
+    const idx = parseInt(img.dataset.gcIdx, 10);
+    const item = data[idx];
+    if (!item) return;
+    if (idx < 6 || !_gcObs) { _gcLoadArt(img, item, isAlbum); }
+    else { img._gcArt = { item, isAlbum }; _gcObs.observe(img); }
+  });
+
+  // Attach click handlers
+  el.querySelectorAll('[data-gc-click]').forEach(node => {
+    const trackId = node.dataset.gcTrack;
+    const albumName = node.dataset.gcAlbum;
+    const artistName = node.dataset.gcArtist;
+    node.addEventListener('click', () => {
+      if (trackId) _gcPlayTrack(trackId);
+      else if (albumName) _gcOpenAlbum(albumName, artistName);
+    });
+  });
+}
+
+function _gcBuildList(data, type) {
+  const isAlbum = type === 'album';
+  const top3 = data.slice(0, 3);
+  const rest  = data.slice(3);
+  let html = '';
+
+  // Podium
+  if (top3.length) {
+    html += '<div class="charts-podium">';
+    top3.forEach((item, i) => {
+      const rank  = i + 1;
+      const badge = rank === 1 ? '🥇' : rank === 2 ? '🥈' : '🥉';
+      const title = _gcEsc(isAlbum ? item.album : item.title);
+      const meta  = _gcEsc(item.artist || '');
+      const plays = _gcFmt(item.plays || item.plays_alltime || 0);
+      const tid   = _gcGetId(item);
+      const isPlayable = !isAlbum && !!tid;
+      const clickData = isPlayable
+        ? `data-gc-click="1" data-gc-track="${_gcEsc(tid)}"`
+        : (isAlbum ? `data-gc-click="1" data-gc-album="${_gcEsc(item.album)}" data-gc-artist="${_gcEsc(item.artist||'')}"` : '');
+      html += `
+      <div class="charts-podium-item pos-${rank}" ${clickData}>
+        <div class="charts-podium-badge">${badge}</div>
+        <div class="charts-podium-art">
+          <img data-gc-idx="${i}" alt="">
+          <div class="gc-art-ph">${isAlbum ? '💿' : '🎵'}</div>
+          <div class="charts-podium-play-hint">${isPlayable ? '▶' : (isAlbum ? '💿' : '')}</div>
+        </div>
+        <div class="charts-podium-title">${title}</div>
+        <div class="charts-podium-meta">${meta}</div>
+        <div class="charts-podium-plays">${plays}<span>plays</span></div>
+      </div>`;
+    });
+    html += '</div>';
+  }
+
+  // Rest
+  if (rest.length) {
+    html += '<div class="charts-list">';
+    rest.forEach((item, rIdx) => {
+      const idx   = rIdx + 3;
+      const rank  = item.rank || idx + 1;
+      const rankCls = rank === 1 ? 'charts-rank-gold' : rank === 2 ? 'charts-rank-silver' : rank === 3 ? 'charts-rank-bronze' : 'charts-rank-other';
+      const title = _gcEsc(isAlbum ? item.album : item.title);
+      const meta  = _gcEsc(item.artist || (isAlbum ? '' : item.album || ''));
+      const plays = _gcFmt(item.plays || item.plays_alltime || 0);
+      const tid   = _gcGetId(item);
+      const isPlayable = !isAlbum && !!tid;
+      const clickData = isPlayable
+        ? `data-gc-click="1" data-gc-track="${_gcEsc(tid)}"`
+        : (isAlbum ? `data-gc-click="1" data-gc-album="${_gcEsc(item.album)}" data-gc-artist="${_gcEsc(item.artist||'')}"` : '');
+      html += `
+      <div class="charts-row" ${clickData}>
+        <div class="charts-row-rank ${rankCls}">${rank}</div>
+        <div class="charts-row-art">
+          <img data-gc-idx="${idx}" alt="">
+          <div class="gc-art-ph">${isAlbum ? '💿' : '🎵'}</div>
+          <div class="charts-row-play-hint">${isPlayable ? '▶' : (isAlbum ? '💿' : '')}</div>
+        </div>
+        <div class="charts-row-info">
+          <div class="charts-row-title">${title}</div>
+          <div class="charts-row-meta">${meta}</div>
+        </div>
+        <div class="charts-row-plays">
+          <div class="charts-row-plays-count">${plays}</div>
+          <div class="charts-row-plays-label">plays</div>
+        </div>
+      </div>`;
+    });
+    html += '</div>';
+  }
+  return html;
+}
+
+function _gcBuildGrid(data, type) {
+  const isAlbum = type === 'album';
+  let html = '<div class="charts-grid">';
+  data.forEach((item, idx) => {
+    const rank    = item.rank || idx + 1;
+    const rankCls = rank === 1 ? 'rank-gold' : rank === 2 ? 'rank-silver' : rank === 3 ? 'rank-bronze' : '';
+    const title   = _gcEsc(isAlbum ? item.album : item.title);
+    const meta    = _gcEsc(item.artist || '');
+    const plays   = _gcFmt(item.plays || item.plays_alltime || 0);
+    const tid     = _gcGetId(item);
+    const isPlayable = !isAlbum && !!tid;
+    const clickData = isPlayable
+      ? `data-gc-click="1" data-gc-track="${_gcEsc(tid)}"`
+      : (isAlbum ? `data-gc-click="1" data-gc-album="${_gcEsc(item.album)}" data-gc-artist="${_gcEsc(item.artist||'')}"` : '');
+    html += `
+    <div class="charts-grid-item" ${clickData}>
+      <div class="charts-grid-art">
+        <img data-gc-idx="${idx}" alt="">
+        <div class="gc-art-ph">${isAlbum ? '💿' : '🎵'}</div>
+        <div class="charts-grid-rank ${rankCls}">#${rank}</div>
+        <div class="charts-grid-plays">${plays}</div>
+        <div class="charts-grid-play-hint">${isPlayable ? '▶' : (isAlbum ? '💿' : '')}</div>
+      </div>
+      <div class="charts-grid-info">
+        <div class="charts-grid-title">${title}</div>
+        <div class="charts-grid-meta">${meta}</div>
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+  return html;
+}
+
+// Flat list used in artist view
+function _gcBuildFlatList(data, type) {
+  const isAlbum = type === 'album';
+  if (!data || !data.length) return '';
+  let html = '<div class="charts-list">';
+  data.forEach((item, idx) => {
+    const rank    = item.rank || idx + 1;
+    const rankCls = rank === 1 ? 'charts-rank-gold' : rank === 2 ? 'charts-rank-silver' : rank === 3 ? 'charts-rank-bronze' : 'charts-rank-other';
+    const title   = _gcEsc(isAlbum ? item.album : item.title);
+    const meta    = _gcEsc(item.artist || (isAlbum ? '' : item.album || ''));
+    const plays   = _gcFmt(item.plays || item.plays_alltime || 0);
+    const tid     = _gcGetId(item);
+    const isPlayable = !isAlbum && !!tid;
+    const clickData = isPlayable
+      ? `data-gc-click="1" data-gc-track="${_gcEsc(tid)}"`
+      : (isAlbum ? `data-gc-click="1" data-gc-album="${_gcEsc(item.album)}" data-gc-artist="${_gcEsc(item.artist||'')}"` : '');
+    html += `
+    <div class="charts-row" ${clickData}>
+      <div class="charts-row-rank ${rankCls}">${rank}</div>
+      <div class="charts-row-art">
+        <img data-gc-idx="${idx}" alt="">
+        <div class="gc-art-ph">${isAlbum ? '💿' : '🎵'}</div>
+        <div class="charts-row-play-hint">${isPlayable ? '▶' : (isAlbum ? '💿' : '')}</div>
+      </div>
+      <div class="charts-row-info">
+        <div class="charts-row-title">${title}</div>
+        <div class="charts-row-meta">${meta}</div>
+      </div>
+      <div class="charts-row-plays">
+        <div class="charts-row-plays-count">${plays}</div>
+        <div class="charts-row-plays-label">plays</div>
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+  return html;
+}
+
+function _gcWireSection(el, data, type) {
+  const isAlbum = type === 'album';
+  el.querySelectorAll('img[data-gc-idx]').forEach(img => {
+    const idx = parseInt(img.dataset.gcIdx, 10);
+    const item = data[idx];
+    if (!item) return;
+    if (idx < 4 || !_gcObs) _gcLoadArt(img, item, isAlbum);
+    else { img._gcArt = { item, isAlbum }; _gcObs.observe(img); }
+  });
+  el.querySelectorAll('[data-gc-click]').forEach(node => {
+    const trackId = node.dataset.gcTrack;
+    const albumName = node.dataset.gcAlbum;
+    const artistName = node.dataset.gcArtist;
+    node.addEventListener('click', () => {
+      if (trackId) _gcPlayTrack(trackId);
+      else if (albumName) _gcOpenAlbum(albumName, artistName);
+    });
+  });
+}
+
+// ── Skeleton ──────────────────────────────────────────────────────
+function _gcShowSkeleton() {
+  const skel = () => Array.from({length:8}, (_, i) => `
+    <div class="charts-skeleton-row">
+      <div class="gc-skel" style="height:16px;border-radius:4px;"></div>
+      <div class="gc-skel" style="height:48px;width:48px;border-radius:10px;"></div>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div class="gc-skel" style="height:14px;width:${60+Math.random()*30|0}%;border-radius:4px;"></div>
+        <div class="gc-skel" style="height:11px;width:${30+Math.random()*20|0}%;border-radius:4px;"></div>
+      </div>
+      <div class="gc-skel" style="height:20px;width:44px;border-radius:4px;"></div>
+    </div>`).join('');
+  const tc = document.getElementById('gcTracksContainer');
+  const ac = document.getElementById('gcAlbumsContainer');
+  if (tc) tc.innerHTML = skel();
+  if (ac) ac.innerHTML = skel();
+}
+
+// ── Empty / error ─────────────────────────────────────────────────
+function _gcEmptyHtml() {
+  return `<div class="charts-empty">
+    <div class="charts-empty-icon">📭</div>
+    <div class="charts-empty-title">Nothing charted yet</div>
+    <div class="charts-empty-sub">Play some music to start the charts!</div>
+  </div>`;
+}
+function _gcErrorHtml(msg) {
+  return `<div class="charts-empty">
+    <div class="charts-empty-icon">⚠️</div>
+    <div class="charts-empty-title">Couldn't load charts</div>
+    <div class="charts-empty-sub">${_gcEsc(msg)}</div>
+  </div>`;
+}
+
+// ── Utils ─────────────────────────────────────────────────────────
+function _gcEsc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function _gcFmt(n) {
+  if (!n) return '0';
+  if (n >= 1e9) return (n/1e9).toFixed(1).replace(/\.0$/,'')+'B';
+  if (n >= 1e6) return (n/1e6).toFixed(1).replace(/\.0$/,'')+'M';
+  if (n >= 1e3) return (n/1e3).toFixed(1).replace(/\.0$/,'')+'K';
+  return String(n);
+}
+
+// ── Artist search ─────────────────────────────────────────────────
+function _gcBuildArtistList() {
+  if (!_gcCache) return [];
+  const map = new Map();
+  (_gcCache.tracks.alltime || []).forEach(t => {
+    if (!t.artist) return;
+    const key = t.artist.trim().toLowerCase();
+    if (!map.has(key)) map.set(key, { artist:t.artist.trim(), songs:new Set(), albums:new Set(), totalPlays:0, topAlbum:t.album||'' });
+    const e = map.get(key);
+    e.songs.add(t.track_id || t.title);
+    e.totalPlays += (t.plays_alltime || t.plays || 0);
+    if (t.album) e.albums.add(t.album);
+  });
+  (_gcCache.albums.alltime || []).forEach(a => {
+    if (!a.artist) return;
+    const key = a.artist.trim().toLowerCase();
+    if (!map.has(key)) map.set(key, { artist:a.artist.trim(), songs:new Set(), albums:new Set(), totalPlays:0, topAlbum:a.album||'' });
+    const e = map.get(key);
+    e.albums.add(a.album);
+    e.totalPlays += (a.plays_alltime || a.plays || 0);
+    if (!e.topAlbum) e.topAlbum = a.album;
+  });
+  return Array.from(map.values())
+    .map(e => ({ artist:e.artist, songCount:e.songs.size, albumCount:e.albums.size, totalPlays:e.totalPlays, topAlbum:e.topAlbum }))
+    .sort((a,b) => b.totalPlays - a.totalPlays);
+}
+
+window.gcArtistFocus = function() {
+  clearTimeout(_gcAcBlur);
+  _gcShowArtistAc(document.getElementById('gcArtistInput').value.trim());
+};
+window.gcArtistBlur = function() {
+  _gcAcBlur = setTimeout(() => {
+    const ac = document.getElementById('gcAutocomplete');
+    if (ac) ac.classList.remove('open');
+  }, 200);
+};
+window.gcArtistInput = function(v) { _gcShowArtistAc(v.trim()); };
+window.gcArtistKeydown = function(e) {
+  const ac = document.getElementById('gcAutocomplete');
+  if (!ac) return;
+  const items = ac.querySelectorAll('.charts-ac-item');
+  if (e.key === 'ArrowDown') { e.preventDefault(); _gcAcIdx = Math.min(_gcAcIdx+1, items.length-1); items.forEach((el,i) => el.classList.toggle('focused', i === _gcAcIdx)); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); _gcAcIdx = Math.max(_gcAcIdx-1, 0); items.forEach((el,i) => el.classList.toggle('focused', i === _gcAcIdx)); }
+  else if (e.key === 'Enter') {
+    if (_gcAcIdx >= 0 && items[_gcAcIdx]) items[_gcAcIdx].click();
+    else if (_gcAcItems.length) _gcSelectArtist(_gcAcItems[0].artist);
+  } else if (e.key === 'Escape') {
+    const ac2 = document.getElementById('gcAutocomplete');
+    if (ac2) ac2.classList.remove('open');
+  }
+};
+
+function _gcShowArtistAc(q) {
+  const ac = document.getElementById('gcAutocomplete');
+  if (!ac) return;
+  _gcAcIdx = -1;
+  const all = _gcBuildArtistList();
+  const filtered = q
+    ? all.filter(a => a.artist.toLowerCase().includes(q.toLowerCase())).slice(0, 10)
+    : all.slice(0, 12);
+  _gcAcItems = filtered;
+  if (!filtered.length) {
+    ac.innerHTML = '<div class="charts-ac-item" style="cursor:default;opacity:0.5">No artists found</div>';
+  } else {
+    ac.innerHTML = filtered.map((a, i) => `
+      <div class="charts-ac-item" data-ac-idx="${i}">
+        <div class="charts-ac-art" id="gcAcArt${i}">
+          <img id="gcAcImg${i}" alt="">
+          <div class="gc-art-ph">🎤</div>
+        </div>
+        <div class="charts-ac-name">${_gcEsc(a.artist)}</div>
+        <div class="charts-ac-count">${a.songCount} song${a.songCount!==1?'s':''}</div>
+      </div>`).join('');
+    ac.querySelectorAll('.charts-ac-item[data-ac-idx]').forEach(el => {
+      const idx = parseInt(el.dataset.acIdx, 10);
+      el.addEventListener('click', () => _gcSelectArtist(_gcAcItems[idx].artist));
+    });
+    filtered.forEach((a, i) => {
+      if (!a.topAlbum) return;
+      const img = document.getElementById('gcAcImg' + i);
+      if (img) _gcLoadArt(img, { album:a.topAlbum, artist:a.artist }, false);
+    });
+  }
+  ac.classList.add('open');
+}
+
+function _gcSelectArtist(name) {
+  const inp = document.getElementById('gcArtistInput');
+  if (inp) inp.value = name;
+  const ac = document.getElementById('gcAutocomplete');
+  if (ac) ac.classList.remove('open');
+  _gcRenderArtistPage(name);
+}
+
+async function _gcRenderArtistPage(artistName) {
+  const page = document.getElementById('charts-artist-page');
+  if (!page) return;
+  document.getElementById('gcArtistName').textContent = artistName;
+  document.getElementById('gcArtistStats').innerHTML = '<span style="opacity:0.4">Loading…</span>';
+  document.getElementById('gcArtistSongs').innerHTML = '';
+  document.getElementById('gcArtistAlbumsContainer').innerHTML = '';
+  page.style.display = 'block';
+  page.classList.add('gc-fade-in');
+
+  let songs, albums;
+  try {
+    const res = await fetch(`${GC_WORKER}/charts/artist?artist=${encodeURIComponent(artistName)}`);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    songs  = (data.tracks || []).map((t,i) => ({...t, rank:i+1, plays:t.plays_alltime||t.plays||0}));
+    albums = (data.albums || []).map((a,i) => ({...a, rank:i+1, plays:a.plays_alltime||a.plays||0}));
+  } catch(e) {
+    document.getElementById('gcArtistStats').innerHTML = `<span style="color:var(--md-sys-color-primary);opacity:0.7">Failed to load</span>`;
+    return;
+  }
+
+  const totalPlays = songs.reduce((s,t) => s + (t.plays||0), 0);
+  document.getElementById('gcArtistStats').innerHTML = `
+    <span class="charts-artist-stat"><strong>${_gcFmt(totalPlays)}</strong> total plays</span>
+    <span class="charts-artist-stat"><strong>${songs.length}</strong> song${songs.length!==1?'s':''}</span>
+    <span class="charts-artist-stat"><strong>${albums.length}</strong> album${albums.length!==1?'s':''}</span>`;
+  document.getElementById('gcArtistSongCount').textContent = songs.length;
+  document.getElementById('gcArtistAlbums').textContent = albums.length;
+
+  const topAlbum = songs[0]?.album || albums[0]?.album || '';
+  const headerImg = document.getElementById('gcArtistImg');
+  if (headerImg) { headerImg.classList.remove('gc-loaded'); headerImg.src = ''; }
+  if (topAlbum && headerImg) _gcLoadArt(headerImg, { album:topAlbum, artist:artistName }, false);
+
+  const songsEl = document.getElementById('gcArtistSongs');
+  const albumsEl = document.getElementById('gcArtistAlbumsContainer');
+  if (songsEl) {
+    songsEl.innerHTML = songs.length ? _gcBuildFlatList(songs, 'track') : '<div style="opacity:0.4;padding:20px;text-align:center;font-size:13px;">No songs found</div>';
+    _gcWireSection(songsEl, songs, 'track');
+  }
+  if (albumsEl) {
+    albumsEl.innerHTML = albums.length ? _gcBuildFlatList(albums, 'album') : '<div style="opacity:0.4;padding:20px;text-align:center;font-size:13px;">No albums found</div>';
+    _gcWireSection(albumsEl, albums, 'album');
+  }
+}
+
+})(); // end IIFE
+</script>
 </main>
 <aside class="side-sheet" id="sidebar">
 <div class="sidebar-resize-handle" id="sidebarResizeHandle"></div>
@@ -25344,7 +26595,7 @@ return _splitArtists(artistTag)[0] || (artistTag || '').trim();
 }
 const _artistFolderCache = new Map();
 const _artistFolderInflight = new Map();
-async function _checkArtistHasFolder(artistName) {
+async function _checkArtistHasFolderOrig(artistName) {
 const key = artistName.toLowerCase();
 if (_artistFolderCache.has(key)) return _artistFolderCache.get(key);
 if (_artistFolderInflight.has(key)) return _artistFolderInflight.get(key);
@@ -25494,7 +26745,7 @@ return;
 }
 showShareToast(`Couldn’t find: ${artists[0] || artistName}`, 'error');
 }
-async function navigateToRealAlbumFolder(albumName, artistName, trackId) {
+async function navigateToRealAlbumFolderOrig(albumName, artistName, trackId) {
 if (!albumName) return;
 const libraryNavItem = document.querySelector('.nav-item[data-screen="library"]');
 if (libraryNavItem && !libraryNavItem.classList.contains('active')) nav(libraryNavItem);
@@ -44041,7 +45292,7 @@ window.refreshDeMarquees = refreshDeMarquees;
 })();
 </script>
 <script>
-const YT_PROXY        = 'https://sensors-modify-productive-laboratory.trycloudflare.com';
+const YT_PROXY        = 'https://fedoramsi.tail399583.ts.net/yt';
 const YT_STREAM_PROXY = 'https://gootstream.peneener2001.workers.dev';
 const YT_SEARCH_WORKER = 'https://ytsearch.goot-api.workers.dev/';
 let isYTMode       = false;   // true when YouTube is the active audio source
@@ -46887,7 +48138,7 @@ return _folderMapCache.get(_fmapMakeKey(type, name, '')) || null;
 }
 
 // Patch _checkArtistHasFolder to check folder-map first (sync, no fetch)
-const _origCheckArtistHasFolder = _checkArtistHasFolder;
+const _origCheckArtistHasFolder = _checkArtistHasFolderOrig;
 async function _checkArtistHasFolder(artistName) {
 const mapped = _checkFolderMapSync('artist', artistName, '');
 if (mapped) {
@@ -46903,7 +48154,7 @@ return _origCheckArtistHasFolder(artistName);
 }
 
 // Patch navigateToRealAlbumFolder to check folder-map first (sync, no fetch)
-const _origNavigateToRealAlbumFolder = navigateToRealAlbumFolder;
+const _origNavigateToRealAlbumFolder = navigateToRealAlbumFolderOrig;
 async function navigateToRealAlbumFolder(albumName, artistName, trackId) {
 if (!albumName) return;
 // Try artist-qualified lookup first, then name-only fallback
