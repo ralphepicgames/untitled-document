@@ -3940,21 +3940,6 @@ gap: 5px;
 border-radius: 999px;
 }
 .lossless-badge.lossless-badge-lg i { font-size: 10px; }
-.song-row-lossless-badge {
-display: inline-block;
-background: linear-gradient(135deg, #d4af37, #f4d976);
-color: #2a2105;
-font-size: 9px;
-font-weight: 700;
-letter-spacing: 0.5px;
-text-transform: uppercase;
-padding: 1px 5px;
-border-radius: 999px;
-margin-left: 6px;
-vertical-align: middle;
-opacity: 0;
-transition: opacity 0.4s ease;
-}
 .single-duration {
 font-size: 11px;
 font-weight: 600;
@@ -4108,6 +4093,7 @@ transition: opacity 0.3s ease, font-size 0.2s var(--motion-standard);
 .folder-artist.visible { opacity: 0.75; }
 .folder-grid.size-large .folder-artist { font-size: 12.5px; }
 .folder-grid.size-small .folder-artist { font-size: 10.5px; }
+
 /* ── V3 Folder Card Style ───────────────────────────────────────────────
 When .folder-style-v3 is on <html>, cards switch to the v3.9 look:
 full-bleed square art with a gradient overlay and bottom-anchored label.
@@ -13386,10 +13372,10 @@ Album</div>
 style="font-size:38px;font-weight:700;letter-spacing:-0.5px;line-height:1.1;word-break:break-word;">
 </div>
 <div id="folderCoverMeta" style="font-size:20px;opacity:0.7;margin-top:2px;font-weight:500;"></div>
-<div id="folderCoverReleaseDate" style="font-size:14px;opacity:0;transition:opacity 0.4s ease;margin-top:2px;letter-spacing:0.3px;min-height:1em;"></div>
+<div id="folderCoverReleaseDate" style="font-size:14px;opacity:0;margin-top:2px;letter-spacing:0.3px;min-height:1em;"></div>
 <div style="display:flex;align-items:center;gap:10px;">
 <div id="folderCoverDuration" style="font-size:14px;opacity:0;margin-top:2px;letter-spacing:0.3px;min-height:1em;"></div>
-<div id="folderCoverLossless" style="opacity:0;transition:opacity 0.4s ease;"><span class="lossless-badge lossless-badge-lg"><i class="fa-solid fa-gem"></i><span id="folderCoverLosslessText">Lossless</span></span></div>
+<div id="folderCoverLossless" style="opacity:0;"><span class="lossless-badge lossless-badge-lg"><i class="fa-solid fa-gem"></i><span id="folderCoverLosslessText">Lossless</span></span></div>
 </div>
 </div>
 <div id="folderCoverActions"
@@ -15349,35 +15335,36 @@ const textEl = document.getElementById('folderCoverLosslessText');
 if (!wrap || !textEl) return;
 const ids = (tracks || []).map(t => t.id).filter(Boolean);
 if (!ids.length) { wrap.style.opacity = '0'; return; }
+// Synchronous fast-path: if every track ID is already in the session cache,
+// read the result right now before any await and paint the badge in the same
+// frame as the rest of the album-view UI — no pop-in.
+const allCached = ids.every(id => _losslessAvailCache.has(id));
+if (allCached) {
+const cachedCount = ids.filter(id => _losslessAvailCache.get(id)).length;
+if (cachedCount > 0) {
+textEl.textContent = cachedCount >= ids.length ? 'Lossless' : `Lossless (${cachedCount}/${ids.length})`;
+wrap.style.transition = 'none';
+wrap.style.opacity = '1';
+requestAnimationFrame(() => { wrap.style.transition = ''; });
+} else {
+wrap.style.transition = 'none';
+wrap.style.opacity = '0';
+requestAnimationFrame(() => { wrap.style.transition = ''; });
+}
+return;
+}
+// Async path: data not yet cached, must hit the network.
+// Badge fades in once the response arrives.
 try {
 const result = await checkLosslessAvailability(ids);
 const availableCount = ids.filter(id => result[id]).length;
-if (availableCount === 0) {
-wrap.style.opacity = '0';
-return;
-}
+if (availableCount === 0) { wrap.style.opacity = '0'; return; }
 textEl.textContent = availableCount >= ids.length ? 'Lossless' : `Lossless (${availableCount}/${ids.length})`;
+wrap.style.transition = 'opacity 0.4s ease';
 wrap.style.opacity = '1';
 } catch (e) {
 wrap.style.opacity = '0';
 }
-}
-/**
-* Reveals the per-row "LOSSLESS" badge in a rendered track table (album view,
-* playlist view, etc.) for any track that has a lossless version available.
-* Runs after rows are already in the DOM so it never blocks initial render.
-*/
-async function populateSongRowLosslessBadges(tracks) {
-const ids = (tracks || []).map(t => t.id).filter(Boolean);
-if (!ids.length) return;
-try {
-const result = await checkLosslessAvailability(ids);
-ids.forEach(id => {
-if (!result[id]) return;
-const badge = document.getElementById(`lossless-row-${id}`);
-if (badge) badge.style.opacity = '0.85';
-});
-} catch (e) { /* lossless check failed — badges just stay hidden */ }
 }
 const CLIENT_AUDIO_CACHE = 'goot-audio-v1';
 const _clientAudioBlobUrls = {}; // trackId → blob URL (session memory, revoked on clear)
@@ -16054,7 +16041,8 @@ const needFetch = trackIds.filter(id => {
 if (options.forceRefresh) return true;
 const cached = trackMetadata[id];
 if (!cached || !cached.title || cached.title === 'Loading...') return true;
-if (!cached.duration) return true; // has metadata but missing duration
+if (!cached.duration) return true;
+if (!cached.release_date) return true;
 return false;
 });
 const cachedCount = trackIds.length - needFetch.length;
@@ -16074,7 +16062,8 @@ album: meta.album || '',
 albumArt: meta.thumbnailLink || meta.albumArt || existingArt,
 year: meta.year,
 genre: meta.genre,
-duration: meta.duration || null,
+duration: meta.duration || trackMetadata[trackId]?.duration || null,
+release_date: meta.release_date || trackMetadata[trackId]?.release_date || null,
 });
 saveCompleteTrackMetadata(trackId, trackMetadata[trackId]).catch(() => {});
 });
@@ -17310,6 +17299,7 @@ year: item.year || 0,
 track: item.track || '',
 albumArt: item.albumArt || null,
 duration: item.duration || null,
+release_date: item.release_date || null,
 albumKey: item.albumKey || generateAlbumKey(item.artist, item.album),
 };
 if (item.album && item.albumArt) {
@@ -18427,6 +18417,7 @@ track: metadata.track || '',
 albumArt: metadata.albumArt || null,
 albumKey: generateAlbumKey(metadata.artist, metadata.album),
 duration: metadata.duration || null,
+release_date: metadata.release_date || null,
 composer: metadata.composer || '',
 comment: metadata.comment || '',
 timestamp: Date.now(),
@@ -19992,7 +19983,7 @@ notifyCentralMetadataUpdate(updatedIds);
 const missingIds = files
 .filter(f => (f.mimeType?.startsWith('audio/') || f.mimeType?.startsWith('video/')) && !f.name?.toLowerCase().endsWith('.m3u'))
 .map(f => f.id)
-.filter(id => !(trackMetadata[id]?.title && trackMetadata[id]?.duration));
+.filter(id => !(trackMetadata[id]?.title && trackMetadata[id]?.duration && trackMetadata[id]?.release_date !== undefined));
 if (missingIds.length > 0) {
 const _doMissingFetch = () => fetch(`${METADATA_API_URL}/metadata/batch`, {
 method: 'POST',
@@ -20013,6 +20004,7 @@ albumArt: item.thumbnailLink || trackMetadata[item.id]?.albumArt || '',
 year:     item.year     || null,
 genre:    item.genre    || null,
 duration: item.duration || null,
+release_date: item.release_date || trackMetadata[item.id]?.release_date || null,
 };
 batchIds.push(item.id);
 });
@@ -20659,13 +20651,27 @@ const entry = folderContentsCache.get(fid);
 if (!entry) return;
 for (const file of entry.data) {
 if ((file.mimeType?.includes('audio') || file.mimeType?.startsWith('video/'))) {
-if (!trackMetadata[file.id]?.duration) ids.push(file.id);
+if (!trackMetadata[file.id]?.duration || !trackMetadata[file.id]?.release_date) ids.push(file.id);
 } else if (file.mimeType === 'application/vnd.google-apps.folder') {
 scanFolder(file.id);
 }
 }
 };
 scanFolder(f.id);
+// Prefetch lossless for all audio files in this folder regardless of whether
+// a metadata fetch is needed — so the badge is warm by the time the user clicks in.
+const allKnownIds = [];
+const scanForLossless = (fid) => {
+const e = folderContentsCache.get(fid);
+if (!e) return;
+for (const file of e.data) {
+if (file.mimeType?.includes('audio') || file.mimeType?.startsWith('video/')) allKnownIds.push(file.id);
+else if (file.mimeType === 'application/vnd.google-apps.folder') scanForLossless(file.id);
+}
+};
+scanForLossless(f.id);
+const uncachedLosslessIds = allKnownIds.filter(id => !_losslessAvailCache.has(id));
+if (uncachedLosslessIds.length) checkLosslessAvailability(uncachedLosslessIds).catch(() => {});
 if (!ids.length) return;
 fetch(`${METADATA_API_URL}/metadata/folder`, {
 method: 'POST',
@@ -20692,6 +20698,11 @@ const bestArtist  = metaArtists.length ? mostCommon(metaArtists) : null;
 const bestAlbum   = metaAlbums.length  ? mostCommon(metaAlbums)  : null;
 if (bestArtist && bestAlbum) _prefetchAOTYCache(bestAlbum, bestArtist);
 }
+// Prefetch lossless availability so the badge is already cached when the
+// album view opens. Fire-and-forget; errors are silently swallowed inside
+// checkLosslessAvailability.
+const allAudioIds = metadata.map(m => m.id).filter(Boolean);
+if (allAudioIds.length) checkLosslessAvailability(allAudioIds).catch(() => {});
 }).catch(() => {});
 }, { passive: true });
 _gridFragment.appendChild(card);
@@ -22060,7 +22071,7 @@ ${artHTML}
 <\!-- Title + artist -->
 <td style="padding:10px 12px;">
 <div class="song-row-info">
-<div class="song-row-title meta-title">${m.title}${(t._isVideo || m._isVideo) ? ' <span class="song-row-video-badge"><i class="fa-solid fa-film" style="font-size:8px;margin-right:2px;"></i>VIDEO</span>' : ''}<span class="song-row-lossless-badge" id="lossless-row-${t.id}"><i class="fa-solid fa-gem" style="font-size:8px;margin-right:2px;"></i>LOSSLESS</span></div>
+<div class="song-row-title meta-title">${m.title}${(t._isVideo || m._isVideo) ? ' <span class="song-row-video-badge"><i class="fa-solid fa-film" style="font-size:8px;margin-right:2px;"></i>VIDEO</span>' : ''}</div>
 <div class="song-row-artist meta-artist" data-artist-tag="${(m.artist||'').replace(/"/g,'&quot;')}" title="Go to artist folder">${renderArtistSpansSync(m.artist||'')}</div>
 </div>
 </td>
@@ -22090,7 +22101,6 @@ if (typeof updateNowPlayingRowIndicator === 'function') updateNowPlayingRowIndic
 if (typeof scheduleRatingCountsForRows === 'function') {
 scheduleRatingCountsForRows(tracks.map(t => t.id));
 }
-populateSongRowLosslessBadges(tracks);
 if (typeof applyBlockedStyles === 'function') applyBlockedStyles();
 if (localStorage.getItem('goot_compact_rows') === 'true') {
 const table = container.closest('table');
@@ -22656,6 +22666,8 @@ artist: item.artist,
 album: stripVersionSuffix(item.album),
 year: item.year,
 genre: item.genre,
+duration: item.duration || null,
+release_date: item.release_date || null,
 thumbnailLink: item.thumbnailLink
 });
 }
@@ -43625,7 +43637,7 @@ item.querySelectorAll('.q-title, .q-artist').forEach(stopQueueMarquee);
 })();
 </script>
 <script>
-const YT_PROXY        = 'https://fine-fee-joining-scholars.trycloudflare.com';
+const YT_PROXY        = 'https://soup-deposits-index-mike.trycloudflare.com/';
 const YT_STREAM_PROXY = 'https://gootstream.peneener2001.workers.dev';
 const YT_SEARCH_WORKER = 'https://ytsearch.goot-api.workers.dev/';
 let isYTMode       = false;   // true when YouTube is the active audio source
