@@ -3952,7 +3952,8 @@ padding: 1px 5px;
 border-radius: 999px;
 margin-left: 6px;
 vertical-align: middle;
-opacity: 0.85;
+opacity: 0;
+transition: opacity 0.4s ease;
 }
 .single-duration {
 font-size: 11px;
@@ -4502,6 +4503,40 @@ position: relative;
 .song-row td{ transition: background 0.15s ease; }
 .song-row:hover td{ background: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent); }
 .song-row.active-row td{ background: var(--md-sys-color-primary-container); }
+.song-row.active-row td:first-child{ box-shadow: inset 3px 0 0 var(--md-sys-color-primary); }
+.song-row.active-row .song-row-title{ color: var(--md-sys-color-primary); }
+.song-row.active-row .song-row-num{ opacity: 1; }
+/* Now-playing indicator: animated bars replace the track number while this row is the current track */
+.song-row-num .np-bars {
+display: none;
+align-items: flex-end;
+justify-content: flex-start;
+gap: 2px;
+height: 13px;
+width: 14px;
+}
+.song-row-num .np-bars span {
+display: block;
+width: 3px;
+border-radius: 1px;
+background: var(--md-sys-color-primary);
+transform-origin: bottom;
+animation: gootRowNpBar 1.1s ease-in-out infinite;
+}
+.song-row-num .np-bars span:nth-child(1){ height: 6px;  animation-delay: -0.9s; }
+.song-row-num .np-bars span:nth-child(2){ height: 13px; animation-delay: -0.5s; }
+.song-row-num .np-bars span:nth-child(3){ height: 9px;  animation-delay: -0.2s; }
+@keyframes gootRowNpBar {
+0%, 100% { transform: scaleY(0.35); }
+50% { transform: scaleY(1); }
+}
+.song-row.active-row .song-row-num .num-label{ display: none; }
+.song-row.active-row .song-row-num .np-bars{ display: flex; }
+/* While the active row is hovered, show the regular play affordance instead of the bars */
+.song-row.active-row:hover .song-row-num .np-bars{ display: none; }
+.song-row.active-row:hover .song-row-num .num-play{ display: block; }
+/* Paused state: freeze the bars at a short static height */
+.song-row.active-row.row-paused .song-row-num .np-bars span{ animation-play-state: paused; transform: scaleY(0.35); }
 /* ── Blocked tracks ─────────────────────────────────────────────────── */
 .song-row.blocked-track td { opacity: 0.38; }
 .song-row.blocked-track:hover td { background: color-mix(in srgb, #ef4444 6%, transparent); }
@@ -5222,6 +5257,8 @@ flex-shrink: 0;
 background: var(--md-sys-color-primary-container);
 border-left: 4px solid var(--md-sys-color-primary);
 }
+/* Dim the now-playing accent slightly while playback is paused */
+.queue-item.active.row-paused { border-left-color: color-mix(in srgb, var(--md-sys-color-primary) 50%, transparent); }
 /* Queue item drop animation - disabled */
 .queue-item.drop-target {}
 /* @keyframes queueDropPulse {
@@ -13349,10 +13386,10 @@ Album</div>
 style="font-size:38px;font-weight:700;letter-spacing:-0.5px;line-height:1.1;word-break:break-word;">
 </div>
 <div id="folderCoverMeta" style="font-size:20px;opacity:0.7;margin-top:2px;font-weight:500;"></div>
-<div id="folderCoverReleaseDate" style="font-size:14px;opacity:0;margin-top:2px;letter-spacing:0.3px;min-height:1em;"></div>
+<div id="folderCoverReleaseDate" style="font-size:14px;opacity:0;transition:opacity 0.4s ease;margin-top:2px;letter-spacing:0.3px;min-height:1em;"></div>
 <div style="display:flex;align-items:center;gap:10px;">
 <div id="folderCoverDuration" style="font-size:14px;opacity:0;margin-top:2px;letter-spacing:0.3px;min-height:1em;"></div>
-<div id="folderCoverLossless" style="display:none;"><span class="lossless-badge lossless-badge-lg"><i class="fa-solid fa-gem"></i><span id="folderCoverLosslessText">Lossless</span></span></div>
+<div id="folderCoverLossless" style="opacity:0;transition:opacity 0.4s ease;"><span class="lossless-badge lossless-badge-lg"><i class="fa-solid fa-gem"></i><span id="folderCoverLosslessText">Lossless</span></span></div>
 </div>
 </div>
 <div id="folderCoverActions"
@@ -15311,18 +15348,18 @@ const wrap = document.getElementById('folderCoverLossless');
 const textEl = document.getElementById('folderCoverLosslessText');
 if (!wrap || !textEl) return;
 const ids = (tracks || []).map(t => t.id).filter(Boolean);
-if (!ids.length) { wrap.style.display = 'none'; return; }
+if (!ids.length) { wrap.style.opacity = '0'; return; }
 try {
 const result = await checkLosslessAvailability(ids);
 const availableCount = ids.filter(id => result[id]).length;
 if (availableCount === 0) {
-wrap.style.display = 'none';
+wrap.style.opacity = '0';
 return;
 }
 textEl.textContent = availableCount >= ids.length ? 'Lossless' : `Lossless (${availableCount}/${ids.length})`;
-wrap.style.display = '';
+wrap.style.opacity = '1';
 } catch (e) {
-wrap.style.display = 'none';
+wrap.style.opacity = '0';
 }
 }
 /**
@@ -15338,7 +15375,7 @@ const result = await checkLosslessAvailability(ids);
 ids.forEach(id => {
 if (!result[id]) return;
 const badge = document.getElementById(`lossless-row-${id}`);
-if (badge) badge.style.display = 'inline-block';
+if (badge) badge.style.opacity = '0.85';
 });
 } catch (e) { /* lossless check failed — badges just stay hidden */ }
 }
@@ -20471,6 +20508,8 @@ _albumBgEl.dataset.bgUrl = ''; // force fresh load on next album open
 }
 const _rdEl = document.getElementById('folderCoverReleaseDate');
 if (_rdEl) { _rdEl.style.transition = 'none'; _rdEl.style.opacity = '0'; _rdEl.textContent = ''; requestAnimationFrame(() => { _rdEl.style.transition = ''; }); }
+const _clEl = document.getElementById('folderCoverLossless');
+if (_clEl) { _clEl.style.transition = 'none'; _clEl.style.opacity = '0'; requestAnimationFrame(() => { _clEl.style.transition = ''; }); }
 const _wasAlbumView = document.getElementById('library-screen')?.classList.contains('album-view');
 if (_wasAlbumView) grid.style.display = 'none';
 const _ls = document.getElementById('library-screen');
@@ -22009,6 +22048,7 @@ ${dragHandleColumn}
 <td class="song-row-num" style="padding:10px 0 10px 20px;">
 <span class="num-label">${String(i + 1).padStart(2, '0')}</span>
 <span class="num-play"><i class="fa-solid fa-play"></i></span>
+<span class="np-bars" aria-hidden="true"><span></span><span></span><span></span></span>
 </td>
 <\!-- Album art -->
 <td class="song-row-art">
@@ -22020,7 +22060,7 @@ ${artHTML}
 <\!-- Title + artist -->
 <td style="padding:10px 12px;">
 <div class="song-row-info">
-<div class="song-row-title meta-title">${m.title}${(t._isVideo || m._isVideo) ? ' <span class="song-row-video-badge"><i class="fa-solid fa-film" style="font-size:8px;margin-right:2px;"></i>VIDEO</span>' : ''}<span class="song-row-lossless-badge" id="lossless-row-${t.id}" style="display:none;"><i class="fa-solid fa-gem" style="font-size:8px;margin-right:2px;"></i>LOSSLESS</span></div>
+<div class="song-row-title meta-title">${m.title}${(t._isVideo || m._isVideo) ? ' <span class="song-row-video-badge"><i class="fa-solid fa-film" style="font-size:8px;margin-right:2px;"></i>VIDEO</span>' : ''}<span class="song-row-lossless-badge" id="lossless-row-${t.id}"><i class="fa-solid fa-gem" style="font-size:8px;margin-right:2px;"></i>LOSSLESS</span></div>
 <div class="song-row-artist meta-artist" data-artist-tag="${(m.artist||'').replace(/"/g,'&quot;')}" title="Go to artist folder">${renderArtistSpansSync(m.artist||'')}</div>
 </div>
 </td>
@@ -22046,6 +22086,7 @@ ${pinned ? `
 </tr>`);
 });
 container.innerHTML = htmlParts.join('');
+if (typeof updateNowPlayingRowIndicator === 'function') updateNowPlayingRowIndicator();
 if (typeof scheduleRatingCountsForRows === 'function') {
 scheduleRatingCountsForRows(tracks.map(t => t.id));
 }
@@ -23834,6 +23875,7 @@ if (fpi) fpi.className = cls;
 function setTrackLoading(idx) {
 // Move the queue highlight immediately so it doesn't lag behind the click
 updateQueueActiveState(idx);
+if (typeof updateNowPlayingRowIndicator === 'function') updateNowPlayingRowIndicator();
 // Swap all three play icons to a spinning circle-notch
 _setPlayIcons('fa-solid fa-circle-notch fa-spin');
 // Add body class for the queue-item pulse animation
@@ -23850,6 +23892,7 @@ document.body.classList.remove('track-loading');
 const _isPlaying = (typeof currentPlayer !== 'undefined' && currentPlayer && !currentPlayer.paused)
 || (typeof isYTMode !== 'undefined' && isYTMode);
 _setPlayIcons(_isPlaying ? 'fa-solid fa-pause' : 'fa-solid fa-play');
+if (typeof updateNowPlayingRowIndicator === 'function') updateNowPlayingRowIndicator();
 }
 function updateQueueActiveState(newIndex) {
 requestAnimationFrame(() => {
@@ -23892,6 +23935,31 @@ requestAnimationFrame(() => updateVirtualQueueVisibleItems(container));
 }
 }
 });
+});
+}
+/**
+* Now-playing indicator for track rows (album view, playlists, folder lists)
+* and for queue items. Highlights the row matching the current track and
+* shows animated equalizer bars in place of the track number when it's
+* actually playing (vs. paused).
+*/
+function updateNowPlayingRowIndicator() {
+const trackId = (typeof queue !== 'undefined' && queue[qIndex]) ? queue[qIndex].id : null;
+const isPlaying = !!(typeof currentPlayer !== 'undefined' && currentPlayer && !currentPlayer.paused);
+// Album / playlist / folder track rows
+document.querySelectorAll('.song-row.active-row').forEach(row => {
+if (row.dataset.trackId !== trackId) row.classList.remove('active-row', 'row-paused');
+});
+if (trackId) {
+document.querySelectorAll(`.song-row[data-track-id="${trackId}"]`).forEach(row => {
+row.classList.add('active-row');
+row.classList.toggle('row-paused', !isPlaying);
+});
+}
+// Queue / up-next items — .active is already managed by updateQueueActiveState;
+// here we only layer on the playing/paused state for the bars animation.
+document.querySelectorAll('.queue-item.active').forEach(item => {
+item.classList.toggle('row-paused', !isPlaying);
 });
 }
 let _skipNextPlayScroll = false;
@@ -26297,6 +26365,7 @@ updateLyricsForTrackChange(trackId);
 requestAnimationFrame(() => {
 analyzeAndApplyNormalization(t.id);
 updateQueueActiveState(idx);
+if (typeof updateNowPlayingRowIndicator === 'function') updateNowPlayingRowIndicator();
 });
 if (!trackMetadata[trackId] || !trackMetadata[trackId].albumArt) {
 getCentralTrackMetadata(trackId, { extractIfMissing: true })
@@ -26396,6 +26465,7 @@ analyzeAndApplyNormalization(t.id);
 if (!_skipNextPlayScroll) {
 updateQueueActiveState(idx);
 }
+if (typeof updateNowPlayingRowIndicator === 'function') updateNowPlayingRowIndicator();
 });
 }
 function _fsArtSetHTML(html) {
@@ -27057,18 +27127,6 @@ renderQueue();
 showNotification(`Playing ${queue.length} tracks from folder`);
 } catch (error) {
 showNotification('Error playing folder');
-}
-}
-function openPinnedFolderFromCard(folderId) {
-const pinnedAlbums = pinnedItems.albums || [];
-const pinnedAlbum = pinnedAlbums.find(p => p.folderId === folderId);
-if (pinnedAlbum) {
-const folderName = pinnedAlbum.name;
-stack.push({id: folderId, name: folderName});
-loadFolders(folderId);
-} else {
-stack.push({id: folderId, name: 'Folder'});
-loadFolders(folderId);
 }
 }
 async function shufflePinnedFolder(folderId) {
@@ -29213,7 +29271,9 @@ fillBtn.disabled = true;
 try {
 // Same ?list= endpoint the rest of the app uses for opening folders — already filters to
 // audio/video files only and sorts naturally by filename (e.g. "01 - Track.mp3" before "02 - ...").
-const res = await fetch(`${STREAMING_URL}?list=${folderId}`, { cache: 'no-store' });
+// Cache-busted (both client + Cloudflare edge) since this folder's contents change frequently
+// right before a batch redirect and a stale cached listing would silently fill wrong/old IDs.
+const res = await fetch(`${STREAMING_URL}?list=${folderId}&_cb=${Date.now()}`, { cache: 'no-store' });
 if (!res.ok) throw new Error('Worker returned ' + res.status);
 const files = await res.json();
 if (!Array.isArray(files) || files.length === 0) {
@@ -29427,7 +29487,9 @@ fillBtn.disabled = true;
 try {
 // Same ?list= endpoint used elsewhere — works for a folder of lossless
 // files (FLAC/WAV/ALAC) just as well as it does for mp3s, sorted by filename.
-const res = await fetch(`${STREAMING_URL}?list=${folderId}`, { cache: 'no-store' });
+// Cache-busted (both client + Cloudflare edge) since you'd typically just dropped
+// new files into this folder, and a stale cached listing would silently miss them.
+const res = await fetch(`${STREAMING_URL}?list=${folderId}&_cb=${Date.now()}`, { cache: 'no-store' });
 if (!res.ok) throw new Error('Worker returned ' + res.status);
 const files = await res.json();
 if (!Array.isArray(files) || files.length === 0) {
@@ -37931,17 +37993,6 @@ handleSearchInput(event);
 function clearTopSearch() {
 clearSearch();
 }
-function closeTopSearchDropdown(event) {
-if (event && event.target !== event.currentTarget) return;
-const dropdown = document.getElementById('topSearchDropdown');
-const input = document.getElementById('topSearchInput');
-if (dropdown) {
-dropdown.classList.remove('visible');
-}
-if (input) {
-input.value = '';
-}
-}
 function openTopSearchDropdown(query) {
 const dropdown = document.getElementById('topSearchDropdown');
 const dropdownInput = document.getElementById('topSearchDropdownInput');
@@ -39247,11 +39298,6 @@ textContent.innerHTML = `
 textContent.scrollTop = 0;
 }
 }
-function escapeHtml(text) {
-const div = document.createElement('div');
-div.textContent = text;
-return div.innerHTML;
-}
 let _lyricsRafId = null;          // rAF handle
 let _lyricsLastActiveIdx = -1;    // track line changes to throttle scroll
 let _lyricsScrollCooldown = 0;    // timestamp — prevents scroll spam
@@ -40174,8 +40220,10 @@ if (currentLyricsData) {
 startLyricsSync();
 }
 }
+if (typeof updateNowPlayingRowIndicator === 'function') updateNowPlayingRowIndicator();
 });
 originalPlayer.addEventListener('pause', () => {
+if (typeof updateNowPlayingRowIndicator === 'function') updateNowPlayingRowIndicator();
 });
 }
 if (secondPlayer) {
@@ -40188,8 +40236,10 @@ if (currentLyricsData) {
 startLyricsSync();
 }
 }
+if (typeof updateNowPlayingRowIndicator === 'function') updateNowPlayingRowIndicator();
 });
 secondPlayer.addEventListener('pause', () => {
+if (typeof updateNowPlayingRowIndicator === 'function') updateNowPlayingRowIndicator();
 });
 }
 window.switchSidebarTab = switchSidebarTab;
@@ -41569,10 +41619,6 @@ bubble.style.background = 'rgba(255,32,32,0.15)';
 setTimeout(() => { bubble.style.background = ''; }, 1200);
 }
 }
-}
-function escapeHtml(str) {
-if (!str) return '';
-return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 function renderPartyMembers() {
 const container = document.getElementById('partyMembersList');
