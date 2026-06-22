@@ -26588,36 +26588,25 @@ return false;
 }
 async function openFolderById(folderId) {
 try {
-// Try to find folder name from already-loaded folder contents cache first
-let folderName = 'Folder';
-for (const [, entry] of folderContentsCache) {
-const match = (entry.data || []).find(f => f.id === folderId && f.mimeType === 'application/vnd.google-apps.folder');
-if (match) { folderName = match.name || 'Folder'; break; }
-}
-// If not found in cache, try fetching the folder listing from the worker to get its name
-if (folderName === 'Folder') {
-try {
-const res = await fetch(`${PLAYER_WORKER_URL}/?list=${folderId}`).catch(() => null);
-if (res?.ok) {
-const json = await res.json();
-// The listing endpoint returns the folder's own metadata in some responses
-if (json.folderName) folderName = json.folderName;
-}
-} catch(e) {}
-}
-// Build a minimal stack: Home + this folder, then navigate
+// Use a trackId hint if we have a currently playing track — folder-search will
+// walk up Drive's parent chain and return the full breadcrumb path, exactly
+// the same way clicking an album in the now-playing bar works.
+const currentTrack = queue[qIndex];
+const trackIdHint = currentTrack?.id || null;
+const params = new URLSearchParams({ root: ROOT_ID, parentFolderId: folderId });
+if (trackIdHint) params.set('trackId', trackIdHint);
+const res = await fetch(`${PLAYER_WORKER_URL}/metadata/folder-search?${params}`).catch(() => null);
+const result = res?.ok ? await res.json().catch(() => null) : null;
 stack.length = 0;
+if (result?.path?.length) {
+result.path.forEach(p => stack.push(p));
+const last = result.path[result.path.length - 1];
+if (last.id !== folderId) stack.push({ id: folderId, name: result.albumFolderName || 'Folder' });
+} else {
 stack.push({ id: ROOT_ID, name: 'Home' });
-stack.push({ id: folderId, name: folderName });
+stack.push({ id: folderId, name: result?.albumFolderName || 'Folder' });
+}
 await loadFolders(folderId);
-// After loadFolders, try to update the breadcrumb name from rendered content if we got 'Folder'
-if (folderName === 'Folder') {
-const topEntry = stack[stack.length - 1];
-if (topEntry && topEntry.id === folderId) {
-const breadcrumb = document.querySelector(`.breadcrumb-item[data-id="${folderId}"]`);
-if (breadcrumb) topEntry.name = breadcrumb.textContent.trim() || 'Folder';
-}
-}
 return true;
 } catch (err) {
 showShareToast('Could not open folder', 'error');
