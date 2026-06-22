@@ -26588,33 +26588,24 @@ return false;
 }
 async function openFolderById(folderId) {
 try {
-// folder-search needs a trackId to walk up Drive's parent chain and build the
-// full breadcrumb path. Use the currently playing track first; if nothing is
-// playing, fetch a track from inside the target folder itself.
-let trackIdHint = (queue[qIndex] && queue[qIndex].id) || null;
-if (!trackIdHint) {
-const listRes = await fetch(PLAYER_WORKER_URL + '/?list=' + folderId).catch(() => null);
-if (listRes && listRes.ok) {
-const json = await listRes.json().catch(() => null);
-const files = (json && (json.files || json)) || [];
-const firstTrack = files.find(function(f) { return f.mimeType && (f.mimeType.startsWith('audio/') || f.mimeType.startsWith('video/')); });
-if (firstTrack) trackIdHint = firstTrack.id;
-}
-}
-if (trackIdHint) {
-const params = new URLSearchParams({ root: ROOT_ID, parentFolderId: folderId, trackId: trackIdHint });
-const res = await fetch(PLAYER_WORKER_URL + '/metadata/folder-search?' + params).catch(() => null);
-const result = (res && res.ok) ? await res.json().catch(() => null) : null;
-if (result && result.path && result.path.length) {
-stack.length = 0;
-result.path.forEach(function(p) { stack.push(p); });
-const last = result.path[result.path.length - 1];
-if (last.id !== folderId) stack.push({ id: folderId, name: result.albumFolderName || 'Folder' });
-await loadFolders(folderId);
+// Load the folder contents first — this populates trackMetadata with album/artist
+// from _meta, exactly like normal folder navigation does.
+const files = await getFolderWithMeta(folderId);
+const firstTrack = files.find(function(f) {
+return f.mimeType && (f.mimeType.startsWith('audio/') || f.mimeType.startsWith('video/'));
+});
+if (firstTrack) {
+const meta = trackMetadata[firstTrack.id] || {};
+const albumName = meta.album || '';
+const artistName = meta.artist || '';
+if (albumName) {
+// Delegate to the exact same function that clicking an album in the now-playing
+// bar uses — it calls _npFolderSearch which builds the full breadcrumb path.
+await navigateToRealAlbumFolder(albumName, artistName, firstTrack.id);
 return true;
 }
 }
-// Fallback: navigate with minimal stack
+// Fallback: no album metadata yet, navigate directly
 stack.length = 0;
 stack.push({ id: ROOT_ID, name: 'Home' });
 stack.push({ id: folderId, name: 'Folder' });
