@@ -16707,9 +16707,12 @@ const _losslessAvailPending = new Map(); // trackId -> Promise (in-flight de-dup
 async function checkLosslessAvailability(ids) {
 const uncachedIds = ids.filter(id => id && !_losslessAvailCache.has(id));
 if (uncachedIds.length) {
-const idsParam = uncachedIds.map(id => encodeURIComponent(id)).join(',');
-let fetchPromise = _losslessAvailPending.get(idsParam);
+// Dedup key is sorted so that two calls with the same IDs in different order
+// share the same in-flight request rather than firing two parallel fetches.
+const dedupeKey = [...uncachedIds].sort().join(',');
+let fetchPromise = _losslessAvailPending.get(dedupeKey);
 if (!fetchPromise) {
+const idsParam = uncachedIds.map(id => encodeURIComponent(id)).join(',');
 fetchPromise = fetch(`${PLAYER_WORKER_URL}/lossless/check?ids=${idsParam}`)
 .then(res => res.ok ? res.json() : null)
 .then(data => {
@@ -16719,8 +16722,8 @@ uncachedIds.forEach(id => _losslessAvailCache.set(id, !!available[id]));
 .catch(() => {
 uncachedIds.forEach(id => { if (!_losslessAvailCache.has(id)) _losslessAvailCache.set(id, false); });
 })
-.finally(() => _losslessAvailPending.delete(idsParam));
-_losslessAvailPending.set(idsParam, fetchPromise);
+.finally(() => _losslessAvailPending.delete(dedupeKey));
+_losslessAvailPending.set(dedupeKey, fetchPromise);
 }
 await fetchPromise;
 }
@@ -22108,8 +22111,9 @@ else if (file.mimeType === 'application/vnd.google-apps.folder') scanForLossless
 }
 };
 scanForLossless(f.id);
-const uncachedLosslessIds = allKnownIds.filter(id => !_losslessAvailCache.has(id));
-if (uncachedLosslessIds.length) checkLosslessAvailability(uncachedLosslessIds).catch(() => {});
+// Lossless prefetch happens after metadata returns (below), so we don't
+// need a separate early fire here — that would cause duplicate requests
+// for the same IDs when the metadata callback also calls checkLosslessAvailability.
 if (!ids.length) return;
 fetch(`${METADATA_API_URL}/metadata/folder`, {
 method: 'POST',
@@ -26298,16 +26302,12 @@ return;
 }
 let lossless = false;
 try {
-const idsParam = tracks.map(t => encodeURIComponent(t.id)).join(',');
-const checkRes = await fetch(`${PLAYER_WORKER_URL}/lossless/check?ids=${idsParam}`);
-if (checkRes.ok) {
-const { available } = await checkRes.json();
-const availableCount = available ? Object.keys(available).length : 0;
+const available = await checkLosslessAvailability(tracks.map(t => t.id));
+const availableCount = Object.values(available).filter(Boolean).length;
 if (availableCount > 0) {
 const choice = await showLosslessDownloadChoice(availableCount, tracks.length);
 if (choice === null) return; // user cancelled
 lossless = choice;
-}
 }
 } catch (e) { /* lossless check failed — fall back to normal-only download */ }
 await _performFolderDownload(currentFolder, tracks, lossless);
