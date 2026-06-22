@@ -14583,6 +14583,13 @@ oninput="blockPanelSearch(this.value)">
 <div id="redirect-existing-banner" style="display:none;font-size:12px;opacity:0.55;padding:6px 10px;background:color-mix(in srgb,var(--md-sys-color-primary) 8%,transparent);border-radius:8px;margin-top:4px;font-family:monospace;word-break:break-all;"></div>
 </div>
 <div id="redirect-status" style="display:none;font-size:13px;padding:8px 12px;border-radius:8px;margin-top:8px;"></div>
+<div style="margin-top:24px;border-top:1px solid color-mix(in srgb,var(--md-sys-color-primary) 15%,transparent);padding-top:16px;">
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+<div style="font-size:13px;font-weight:600;opacity:0.75;">Active Redirects</div>
+<button class="m3-btn m3-btn-tonal" style="padding:4px 10px;font-size:12px;" onclick="loadTrackRedirectsList()"><i class="fa-solid fa-rotate"></i></button>
+</div>
+<div id="redirect-active-list" style="display:flex;flex-direction:column;gap:8px;max-height:420px;overflow-y:auto;"></div>
+</div>
 </div>
 <div class="m3-card" id="settings-panel-album-redirect" style="display:none;padding:20px 16px;">
 <div style="margin-bottom:16px;">
@@ -30691,6 +30698,8 @@ status.style.display = '';
 document.getElementById('redirect-existing-banner').textContent = 'Existing redirect → ' + newId;
 document.getElementById('redirect-existing-banner').style.display = '';
 document.getElementById('redirect-new-id-input').value = '';
+_trackRedirectsCache[_redirectSelectedTrackId] = newId;
+renderTrackRedirectsList();
 } else {
 throw new Error('Worker returned ' + res.status);
 }
@@ -30700,7 +30709,138 @@ status.style.background = 'color-mix(in srgb,#ef4444 15%,transparent)';
 status.style.display = '';
 }
 }
-// ---------------- Album Batch Redirect ----------------
+// ---------------- Active Track Redirects List ----------------
+let _trackRedirectsCache = {}; // from-id -> to-id
+let _trackRedirectPreviewAudio = null;
+let _trackRedirectPreviewBtnId = null;
+async function loadTrackRedirectsList() {
+    const list = document.getElementById('redirect-active-list');
+    if (!list) return;
+    list.innerHTML = '<div style="font-size:13px;opacity:0.4;padding:8px 4px;">Loading…</div>';
+    try {
+        const res = await fetch(PLAYER_WORKER_URL + '/redirect/list', { cache: 'no-store' });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        _trackRedirectsCache = data.redirects || {};
+        renderTrackRedirectsList();
+    } catch (e) {
+        list.innerHTML = '<div style="font-size:13px;opacity:0.4;padding:8px 4px;">Failed to load redirects.</div>';
+    }
+}
+function _redirectLookupMeta(id) {
+    const m = (typeof trackMetadata !== 'undefined' && trackMetadata[id]) || null;
+    if (m) return { title: m.title || 'Unknown Track', artist: m.artist || '' };
+    const t = (typeof allTracks !== 'undefined' && allTracks.find(t => t.id === id)) || null;
+    if (t) return { title: t.title || t.name || 'Unknown Track', artist: t.artist || '' };
+    return null;
+}
+function renderTrackRedirectsList() {
+    const list = document.getElementById('redirect-active-list');
+    if (!list) return;
+    const entries = Object.entries(_trackRedirectsCache);
+    if (entries.length === 0) {
+        list.innerHTML = '<div style="font-size:13px;opacity:0.4;padding:8px 4px;">No active redirects.</div>';
+        return;
+    }
+    list.innerHTML = entries.map(([from, to]) => {
+        const fromMeta = _redirectLookupMeta(from);
+        const toMeta = _redirectLookupMeta(to);
+        const fromLabel = fromMeta ? cleanDisplayName(fromMeta.title) + (fromMeta.artist ? ' — ' + fromMeta.artist : '') : from.slice(0, 10) + '…';
+        const toLabel = toMeta ? cleanDisplayName(toMeta.title) + (toMeta.artist ? ' — ' + toMeta.artist : '') : to.slice(0, 10) + '…';
+        const safeFrom = from.replace(/"/g, '&quot;');
+        const safeTo = to.replace(/"/g, '&quot;');
+        return `
+<div class="redirect-active-row" data-from="${safeFrom}" style="background:color-mix(in srgb,var(--md-sys-color-surface-variant) 45%,transparent);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;">
+<div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${from}">${fromLabel}</div>
+<div style="font-size:11px;opacity:0.45;font-family:monospace;word-break:break-all;">${from}</div>
+<div style="display:flex;align-items:center;gap:6px;font-size:12px;opacity:0.7;">
+<i class="fa-solid fa-arrow-right" style="font-size:10px;opacity:0.5;"></i>
+<span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${toLabel}</span>
+</div>
+<div style="font-size:11px;opacity:0.45;font-family:monospace;word-break:break-all;">${to}</div>
+<div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap;">
+<button class="m3-btn m3-btn-tonal" style="padding:5px 10px;font-size:12px;" data-rd-preview="${safeFrom}" data-rd-which="original" onclick="toggleTrackRedirectPreview(this, '${safeFrom}', 'original')"><i class="fa-solid fa-play"></i> Original</button>
+<button class="m3-btn m3-btn-tonal" style="padding:5px 10px;font-size:12px;" data-rd-preview="${safeFrom}" data-rd-which="redirected" onclick="toggleTrackRedirectPreview(this, '${safeFrom}', 'redirected')"><i class="fa-solid fa-play"></i> Redirected</button>
+<button class="m3-btn m3-btn-tonal" style="padding:5px 10px;font-size:12px;" onclick="editTrackRedirect('${safeFrom}', '${safeTo}')"><i class="fa-solid fa-pen"></i> Edit</button>
+<button class="m3-btn m3-btn-tonal" style="padding:5px 10px;font-size:12px;color:#ef4444;" onclick="removeTrackRedirect('${safeFrom}')"><i class="fa-solid fa-trash"></i> Remove</button>
+</div>
+</div>`;
+    }).join('');
+}
+function _stopTrackRedirectPreview() {
+    if (_trackRedirectPreviewAudio) {
+        try { _trackRedirectPreviewAudio.pause(); } catch (_) {}
+        _trackRedirectPreviewAudio = null;
+    }
+    if (_trackRedirectPreviewBtnId) {
+        const prevBtn = document.querySelector(`[data-rd-preview="${_trackRedirectPreviewBtnId.from}"][data-rd-which="${_trackRedirectPreviewBtnId.which}"]`);
+        if (prevBtn) prevBtn.innerHTML = `<i class="fa-solid fa-play"></i> ${_trackRedirectPreviewBtnId.which === 'original' ? 'Original' : 'Redirected'}`;
+    }
+    _trackRedirectPreviewBtnId = null;
+}
+function toggleTrackRedirectPreview(btn, from, which) {
+    const isSameAndPlaying = _trackRedirectPreviewBtnId
+        && _trackRedirectPreviewBtnId.from === from
+        && _trackRedirectPreviewBtnId.which === which
+        && _trackRedirectPreviewAudio && !_trackRedirectPreviewAudio.paused;
+    _stopTrackRedirectPreview();
+    if (isSameAndPlaying) return; // user clicked the playing button again -> just stop
+    const label = which === 'original' ? 'Original' : 'Redirected';
+    const url = which === 'original'
+        ? `${PLAYER_WORKER_URL}/?id=${encodeURIComponent(from)}&raw=1`
+        : `${PLAYER_WORKER_URL}/?id=${encodeURIComponent(from)}`;
+    const audio = new Audio(url);
+    audio.crossOrigin = 'anonymous';
+    btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> ${label}`;
+    _trackRedirectPreviewAudio = audio;
+    _trackRedirectPreviewBtnId = { from, which };
+    audio.addEventListener('playing', () => {
+        if (_trackRedirectPreviewBtnId && _trackRedirectPreviewBtnId.from === from && _trackRedirectPreviewBtnId.which === which) {
+            btn.innerHTML = `<i class="fa-solid fa-pause"></i> ${label}`;
+        }
+    });
+    audio.addEventListener('ended', () => { if (_trackRedirectPreviewBtnId && _trackRedirectPreviewBtnId.from === from && _trackRedirectPreviewBtnId.which === which) _stopTrackRedirectPreview(); });
+    audio.addEventListener('error', () => {
+        if (_trackRedirectPreviewBtnId && _trackRedirectPreviewBtnId.from === from && _trackRedirectPreviewBtnId.which === which) {
+            btn.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${label}`;
+            setTimeout(() => { if (btn.isConnected) btn.innerHTML = `<i class="fa-solid fa-play"></i> ${label}`; }, 1500);
+            _trackRedirectPreviewAudio = null;
+            _trackRedirectPreviewBtnId = null;
+        }
+    });
+    audio.play().catch(() => {
+        btn.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> ${label}`;
+        setTimeout(() => { if (btn.isConnected) btn.innerHTML = `<i class="fa-solid fa-play"></i> ${label}`; }, 1500);
+        _trackRedirectPreviewAudio = null;
+        _trackRedirectPreviewBtnId = null;
+    });
+}
+async function editTrackRedirect(from, currentTo) {
+    _stopTrackRedirectPreview();
+    const meta = _redirectLookupMeta(from);
+    await redirectSelectTrack(from, meta ? meta.title : from, meta ? meta.artist : '');
+    document.getElementById('redirect-new-id-input').value = currentTo;
+    document.getElementById('redirect-search-input')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+async function removeTrackRedirect(from) {
+    if (!confirm('Remove this redirect? The track will play its original file again.')) return;
+    _stopTrackRedirectPreview();
+    try {
+        const res = await fetch(PLAYER_WORKER_URL + '/redirect?from=' + encodeURIComponent(from), {
+            method: 'DELETE',
+            headers: { 'X-Admin-Key': 'penis' }
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        delete _trackRedirectsCache[from];
+        renderTrackRedirectsList();
+        if (_redirectSelectedTrackId === from) {
+            document.getElementById('redirect-existing-banner').style.display = 'none';
+        }
+    } catch (e) {
+        alert('Failed to remove redirect: ' + e.message);
+    }
+}
+
 let _albumRedirectSearchTimeout = null;
 const _albumRedirectSearchResults = new Map(); // album+artist key -> {album, artist}
 let _albumRedirectTracks = []; // sorted track list for the selected album: [{id, title, artist, track_number}]
@@ -46581,6 +46721,7 @@ secret: true
 },
 };
 function openSettingsSection(key) {
+if (typeof _stopTrackRedirectPreview === 'function') _stopTrackRedirectPreview();
 const section = SETTINGS_SECTIONS[key];
 if (!section) return;
 Object.values(SETTINGS_SECTIONS).forEach(s => {
@@ -46611,9 +46752,11 @@ const blockPanel = document.getElementById('settings-panel-block-tracks');
 if (blockPanel) blockPanel.style.display = (key === 'redirect') ? '' : 'none';
 if (key === 'redirect') {
 renderBlockList();
+loadTrackRedirectsList();
 }
 }
 function closeSettingsSection() {
+if (typeof _stopTrackRedirectPreview === 'function') _stopTrackRedirectPreview();
 const menuView = document.getElementById('settings-menu-view');
 const detailView = document.getElementById('settings-detail-view');
 const blockPanel = document.getElementById('settings-panel-block-tracks');
