@@ -13179,10 +13179,19 @@ style="position:fixed;inset:0;background:rgba(0,0,0,0.8);display:none;align-item
 </button>
 </div>
 </div>
+<div class="share-id-row">
+<div class="share-id-label">Share Link</div>
+<div class="share-id-field" id="shareTrackLinkField">
+<input type="text" class="share-id-input" id="shareTrackLinkBox" readonly onclick="this.select()">
+<button class="share-id-copy-btn" id="shareTrackLinkCopyBtn" onclick="copyShareLink()">
+<i class="fa-solid fa-link"></i> Copy
+</button>
+</div>
+</div>
 <div class="share-actions-grid">
-<button class="share-act-btn primary-act" onclick="copyShareCode()">
-<div class="share-act-icon"><i class="fa-solid fa-copy"></i></div>
-<span class="share-act-label">Copy ID</span>
+<button class="share-act-btn primary-act" onclick="copyShareLink()">
+<div class="share-act-icon"><i class="fa-solid fa-link"></i></div>
+<span class="share-act-label">Copy Link</span>
 </button>
 <button class="share-act-btn" onclick="downloadSharedTrack()">
 <div class="share-act-icon"><i class="fa-solid fa-download"></i></div>
@@ -13200,7 +13209,7 @@ style="position:fixed;inset:0;background:rgba(0,0,0,0.8);display:none;align-item
 <div class="share-act-icon"><i class="fa-solid fa-circle-down"></i></div>
 <span class="share-act-label">Play Last</span>
 </button>
-<button class="share-act-btn" id="npCardBtn" onclick="generateNowPlayingCard()" style="grid-column:1/-1;">
+<button class="share-act-btn" id="npCardBtn" onclick="generateNowPlayingCard()">
 <div class="share-act-icon"><i class="fa-solid fa-image"></i></div>
 <span class="share-act-label">Now Playing Card</span>
 </button>
@@ -25671,8 +25680,12 @@ const heroSub = document.getElementById('shareModalTrackInfo');
 if (heroSub) heroSub.textContent = `${title} · ${artist}`;
 const codeInput = document.getElementById('shareCodeBox');
 if (codeInput) codeInput.value = SHARE_TOKEN_TRACK_PREFIX + trackId;
+const linkInput = document.getElementById('shareTrackLinkBox');
+if (linkInput) linkInput.value = GOOT_APP_BASE_URL + '#' + SHARE_TOKEN_TRACK_PREFIX + trackId;
 const copyBtn = document.getElementById('shareIdCopyBtn');
 if (copyBtn) { copyBtn.innerHTML = '<i class="fa-solid fa-copy"></i> Copy'; copyBtn.classList.remove('copied'); }
+const linkCopyBtn = document.getElementById('shareTrackLinkCopyBtn');
+if (linkCopyBtn) { linkCopyBtn.innerHTML = '<i class="fa-solid fa-link"></i> Copy'; linkCopyBtn.classList.remove('copied'); }
 const field = document.getElementById('shareIdField');
 if (field) field.classList.remove('copy-flash');
 const modal = document.getElementById('shareModal');
@@ -25896,18 +25909,42 @@ showShareToast('Track share token copied! Paste in search to play');
 showShareToast('Failed to copy to clipboard', 'error');
 }
 }
+async function copyShareLink() {
+if (!currentShareTrackId) {
+showShareToast('No track ID found', 'error');
+return;
+}
+try {
+const link = GOOT_APP_BASE_URL + '#' + SHARE_TOKEN_TRACK_PREFIX + currentShareTrackId;
+await navigator.clipboard.writeText(link);
+const btn = document.getElementById('shareTrackLinkCopyBtn');
+if (btn) {
+btn.innerHTML = '<i class="fa-solid fa-check"></i> Copied!';
+btn.classList.add('copied');
+setTimeout(() => {
+btn.innerHTML = '<i class="fa-solid fa-link"></i> Copy';
+btn.classList.remove('copied');
+}, 2000);
+}
+const field = document.getElementById('shareTrackLinkField');
+if (field) { field.classList.add('copy-flash'); setTimeout(() => field.classList.remove('copy-flash'), 600); }
+showShareToast('Share link copied!');
+} catch (err) {
+showShareToast('Failed to copy to clipboard', 'error');
+}
+}
 async function shareTrackNative() {
 if (!currentShareTrackId) return;
 const meta = trackMetadata[currentShareTrackId];
 const queueTrack = queue.find(t => t.id === currentShareTrackId);
 const title = meta?.title || queueTrack?.title || 'Track';
-const token = SHARE_TOKEN_TRACK_PREFIX + currentShareTrackId;
+const link = GOOT_APP_BASE_URL + '#' + SHARE_TOKEN_TRACK_PREFIX + currentShareTrackId;
 if (navigator.share) {
 try {
-await navigator.share({ title: `GootV4 – ${title}`, text: token });
+await navigator.share({ title: `GootV4 – ${title}`, url: link });
 } catch (_) { /* cancelled */ }
 } else {
-copyShareCode();
+copyShareLink();
 }
 }
 function addToQueue_fromShare(mode = 'last') {
@@ -26815,9 +26852,15 @@ showNotification('No folder to share', 'error');
 return;
 }
 const currentFolder = stack[stack.length - 1];
-const folderPath = stack.map(s => s.name).join(' / ');
+const folderPath = stack.map(s => s.name).join(' › ');
 const folderId = currentFolder.id;
 const shareToken = SHARE_TOKEN_FOLDER_PREFIX + folderId;
+const shareLink = GOOT_APP_BASE_URL + '#' + SHARE_TOKEN_FOLDER_PREFIX + folderId;
+const folderBreadcrumbHtml = stack.map((s, i) => {
+const isLast = i === stack.length - 1;
+return (i > 0 ? '<span style="opacity:0.4;margin:0 4px;font-size:11px">›</span>' : '') +
+'<span style="' + (isLast ? 'font-weight:600;' : '') + '">' + s.name.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</span>';
+}).join('');
 const existingFolderModal = document.getElementById('folderShareModal');
 if (existingFolderModal) existingFolderModal.remove();
 const modal = document.createElement('div');
@@ -26832,7 +26875,7 @@ modal.innerHTML = `
 </div>
 <div class="share-modal-hero-text">
 <h3 class="share-modal-hero-title">Share Folder</h3>
-<p class="share-modal-hero-sub" title="${folderPath}">${folderPath}</p>
+<p class="share-modal-hero-sub share-folder-breadcrumb" title="${folderPath}">${folderBreadcrumbHtml}</p>
 </div>
 <button class="share-modal-close" onclick="document.getElementById('folderShareModal').remove()" title="Close">
 <i class="fa-solid fa-xmark"></i>
@@ -26848,18 +26891,27 @@ modal.innerHTML = `
 </button>
 </div>
 </div>
+<div class="share-id-row">
+<div class="share-id-label">Share Link</div>
+<div class="share-id-field" id="folderShareLinkField">
+<input type="text" class="share-id-input" id="folderShareLinkInput" value="${shareLink}" readonly onclick="this.select()">
+<button class="share-id-copy-btn" id="folderLinkCopyBtn" onclick="_copyFolderLink('${folderId}')">
+<i class="fa-solid fa-link"></i> Copy
+</button>
+</div>
+</div>
 <div class="share-actions-grid">
-<button class="share-act-btn primary-act" onclick="_copyFolderId('${folderId}')">
+<button class="share-act-btn primary-act" onclick="_copyFolderLink('${folderId}')">
+<div class="share-act-icon"><i class="fa-solid fa-link"></i></div>
+<span class="share-act-label">Copy Link</span>
+</button>
+<button class="share-act-btn" onclick="_copyFolderId('${folderId}')">
 <div class="share-act-icon"><i class="fa-solid fa-copy"></i></div>
 <span class="share-act-label">Copy Token</span>
 </button>
 <button class="share-act-btn" onclick="_shareFolderNative('${folderId}', '${encodeURIComponent(currentFolder.name)}')">
 <div class="share-act-icon"><i class="fa-solid fa-share-nodes"></i></div>
 <span class="share-act-label">Share…</span>
-</button>
-<button class="share-act-btn" onclick="navigator.clipboard.writeText('${folderId}').then(()=>showShareToast('Raw ID copied'))">
-<div class="share-act-icon"><i class="fa-solid fa-fingerprint"></i></div>
-<span class="share-act-label">Copy Raw ID</span>
 </button>
 <button class="share-act-btn danger-act" onclick="downloadCurrentFolder();document.getElementById('folderShareModal').remove()">
 <div class="share-act-icon"><i class="fa-solid fa-file-zipper"></i></div>
@@ -26868,7 +26920,7 @@ modal.innerHTML = `
 </div>
 <div class="share-hint-strip">
 <i class="fa-solid fa-circle-info"></i>
-<span>Paste the Share Token into the search bar to instantly open this folder in any GootV4 session — no ambiguity.</span>
+<span>Share Link opens this folder directly in any GootV4 session. Paste the Token into the search bar instead.</span>
 </div>
 </div>
 </div>
@@ -26886,6 +26938,17 @@ if (field) { field.classList.add('copy-flash'); setTimeout(() => field.classList
 showShareToast('Folder share token copied! Paste in search to open');
 } catch (_) { showShareToast('Failed to copy', 'error'); }
 }
+async function _copyFolderLink(folderId) {
+try {
+const link = GOOT_APP_BASE_URL + '#' + SHARE_TOKEN_FOLDER_PREFIX + folderId;
+await navigator.clipboard.writeText(link);
+const btn = document.getElementById('folderLinkCopyBtn');
+if (btn) { btn.innerHTML = '<i class="fa-solid fa-check"></i> Copied!'; btn.classList.add('copied'); setTimeout(() => { btn.innerHTML = '<i class="fa-solid fa-link"></i> Copy'; btn.classList.remove('copied'); }, 2000); }
+const field = document.getElementById('folderShareLinkField');
+if (field) { field.classList.add('copy-flash'); setTimeout(() => field.classList.remove('copy-flash'), 600); }
+showShareToast('Folder link copied!');
+} catch (_) { showShareToast('Failed to copy', 'error'); }
+}
 async function _copyFolderCode(shareCode) {
 try {
 await navigator.clipboard.writeText(shareCode);
@@ -26898,12 +26961,12 @@ showShareToast('Share code copied! Paste in search to open folder');
 }
 async function _shareFolderNative(folderId, encodedName) {
 const name = decodeURIComponent(encodedName);
-const token = SHARE_TOKEN_FOLDER_PREFIX + folderId;
+const link = GOOT_APP_BASE_URL + '#' + SHARE_TOKEN_FOLDER_PREFIX + folderId;
 if (navigator.share) {
-try { await navigator.share({ title: `GootV4 – ${name}`, text: token }); }
+try { await navigator.share({ title: `GootV4 – ${name}`, url: link }); }
 catch (_) { /* cancelled */ }
 } else {
-_copyFolderId(folderId);
+_copyFolderLink(folderId);
 }
 }
 async function navigateToSharedFolder(shareCode) {
@@ -39169,6 +39232,10 @@ continue;
 }
 const SHARE_TOKEN_TRACK_PREFIX  = 'goot-track:';
 const SHARE_TOKEN_FOLDER_PREFIX = 'goot-folder:';
+const GOOT_APP_BASE_URL = (function() {
+  // Use current origin so it works on any deployment (workers.dev, localhost, etc.)
+  return window.location.origin + window.location.pathname.replace(/\/$/, '');
+})();
 const _RAW_DRIVE_ID = /^[A-Za-z0-9_-]{25,44}$/;
 /**
 * Returns one of: 'yt-url', 'yt-id', 'share-track', 'share-folder',
@@ -47398,7 +47465,8 @@ tryPopulateWhenReady(30);
 }
 function _tryPendingTrack(attempts) {
 var hash = window.location.hash;
-if (!hash || !hash.startsWith('#goot-track:')) return;
+if (!hash) return;
+if (hash.startsWith('#goot-track:')) {
 var trackId = decodeURIComponent(hash.slice('#goot-track:'.length)).trim();
 if (!trackId) return;
 history.replaceState(null, '', window.location.pathname + window.location.search);
@@ -47406,6 +47474,25 @@ if (document.body) {
 _showLaunchOverlay(trackId);
 } else if (attempts > 0) {
 setTimeout(function(){ _tryPendingTrack(attempts - 1); }, 300);
+}
+} else if (hash.startsWith('#goot-folder:')) {
+var folderId = decodeURIComponent(hash.slice('#goot-folder:'.length)).trim();
+if (!folderId) return;
+history.replaceState(null, '', window.location.pathname + window.location.search);
+if (document.body) {
+// Navigate to folder once the app is ready
+(function _waitForApp(n) {
+if (typeof openFolderById === 'function' && typeof loadFolders === 'function') {
+const libNav = document.querySelector('.nav-item[data-screen="library"]');
+if (libNav) nav(libNav);
+openFolderById(folderId).catch(function() { showShareToast && showShareToast('Could not open shared folder', 'error'); });
+} else if (n > 0) {
+setTimeout(function(){ _waitForApp(n - 1); }, 400);
+}
+})(40);
+} else if (attempts > 0) {
+setTimeout(function(){ _tryPendingTrack(attempts - 1); }, 300);
+}
 }
 }
 if (document.readyState === 'loading') {
