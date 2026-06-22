@@ -26588,24 +26588,36 @@ return false;
 }
 async function openFolderById(folderId) {
 try {
-const params = new URLSearchParams({ id: folderId, root: ROOT_ID });
-const pathRes = await fetch(`${PLAYER_WORKER_URL}/metadata/folder-path?${params}`).catch(() => null);
-if (pathRes?.ok) {
-const { path } = await pathRes.json();
-if (path?.length) {
-stack.length = 0;
-path.forEach(p => stack.push(p));
-await loadFolders(folderId);
-return true;
-}
-}
+// Try to find folder name from already-loaded folder contents cache first
 let folderName = 'Folder';
+for (const [, entry] of folderContentsCache) {
+const match = (entry.data || []).find(f => f.id === folderId && f.mimeType === 'application/vnd.google-apps.folder');
+if (match) { folderName = match.name || 'Folder'; break; }
+}
+// If not found in cache, try fetching the folder listing from the worker to get its name
+if (folderName === 'Folder') {
 try {
-const meta = await fetch(`https://www.googleapis.com/drive/v3/files/${folderId}?fields=name&key=${API_KEY}`);
-if (meta.ok) folderName = (await meta.json()).name || 'Folder';
+const res = await fetch(`${PLAYER_WORKER_URL}/?list=${folderId}`).catch(() => null);
+if (res?.ok) {
+const json = await res.json();
+// The listing endpoint returns the folder's own metadata in some responses
+if (json.folderName) folderName = json.folderName;
+}
 } catch(e) {}
+}
+// Build a minimal stack: Home + this folder, then navigate
+stack.length = 0;
+stack.push({ id: ROOT_ID, name: 'Home' });
 stack.push({ id: folderId, name: folderName });
 await loadFolders(folderId);
+// After loadFolders, try to update the breadcrumb name from rendered content if we got 'Folder'
+if (folderName === 'Folder') {
+const topEntry = stack[stack.length - 1];
+if (topEntry && topEntry.id === folderId) {
+const breadcrumb = document.querySelector(`.breadcrumb-item[data-id="${folderId}"]`);
+if (breadcrumb) topEntry.name = breadcrumb.textContent.trim() || 'Folder';
+}
+}
 return true;
 } catch (err) {
 showShareToast('Could not open folder', 'error');
