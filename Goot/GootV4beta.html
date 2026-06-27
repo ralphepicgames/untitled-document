@@ -14192,6 +14192,14 @@ onmouseenter="this.style.opacity='1'" onmouseleave="this.style.opacity='0'">
 </div>
 <i class="fa-solid fa-chevron-right settings-nav-arrow"></i>
 </button>
+<button class="settings-nav-row" id="settings-nav-file-manager" onclick="openSettingsSection('file-manager')" style="display:none;">
+<div class="settings-nav-icon"><i class="fa-solid fa-folder-open"></i></div>
+<div class="settings-nav-text">
+<div class="settings-nav-title">File Manager</div>
+<div class="settings-nav-sub">Browse, upload, rename folders and set covers</div>
+</div>
+<i class="fa-solid fa-chevron-right settings-nav-arrow"></i>
+</button>
 </div>
 </div><!-- /settings-menu-view -->
 <div id="settings-detail-view" style="display:none;">
@@ -14774,6 +14782,9 @@ style="width:100%;box-sizing:border-box;padding:10px 14px 10px 34px;border-radiu
 </div>
 </div>
 </div>
+</div>
+<div class="m3-card" id="settings-panel-file-manager" style="display:none;padding:0;margin-bottom:16px;overflow:hidden;">
+<div id="gfm-root" style="font-family:inherit;"></div>
 </div>
 <div id="all-played-screen" class="screen">
 <div class="all-played-header">
@@ -30571,6 +30582,8 @@ const folderMapBtn = document.getElementById('settings-nav-folder-map');
 if (folderMapBtn) folderMapBtn.style.display = '';
 const metaEditRow = document.getElementById('settings-nav-metadata-edit');
 if (metaEditRow) metaEditRow.style.display = '';
+const fileManagerBtn = document.getElementById('settings-nav-file-manager');
+if (fileManagerBtn) fileManagerBtn.style.display = '';
 showNotification('🔓 Admin tools unlocked');
 }
 } else {
@@ -46719,6 +46732,13 @@ icon: '<i class="fa-solid fa-chart-simple"></i>',
 panel: 'settings-panel-chart-rename',
 secret: true
 },
+'file-manager': {
+title: 'File Manager',
+sub: 'Browse, upload, rename folders and set covers',
+icon: '<i class="fa-solid fa-folder-open"></i>',
+panel: 'settings-panel-file-manager',
+secret: true
+},
 };
 function openSettingsSection(key) {
 if (typeof _stopTrackRedirectPreview === 'function') _stopTrackRedirectPreview();
@@ -47671,10 +47691,14 @@ const tryFetch = async (a) => {
 const key = (a + '||' + album).toLowerCase();
 if (_aotyCache.has(key)) return;
 try {
-const url = `https://aoty-api.hnh65483.workers.dev/?artist=${encodeURIComponent(a)}&album=${encodeURIComponent(album)}`;
+const url = `https://aoty.prigoana.pw/album?artist=${encodeURIComponent(a)}&name=${encodeURIComponent(album)}`;
 const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
 if (!res.ok) return null;
-const data = await res.json();
+const raw = await res.json();
+let data = raw;
+if (raw && (raw.criticScore || raw.userScore)) {
+    data = { url: raw.url, critic: raw.criticScore ? { score: raw.criticScore, count: raw.criticCount || null, reviews: (raw.reviews || []).map(r => ({ score: r.score, publication: r.publication, author: r.author, text: r.text, url: r.url })) } : null, user: raw.userScore ? { score: raw.userScore, count: raw.userCount || null } : null };
+}
 if (data && (data.critic || data.user)) { _aotyCache.set(key, data); return data; }
 } catch(_) {}
 return null;
@@ -47713,10 +47737,19 @@ const _tryArtist = async (a) => {
 const key = (a + '||' + album).toLowerCase();
 if (_aotyCache.has(key)) return _aotyCache.get(key);
 try {
-const url = `https://aoty-api.hnh65483.workers.dev/?artist=${encodeURIComponent(a)}&album=${encodeURIComponent(album)}`;
+const url = `https://aoty.prigoana.pw/album?artist=${encodeURIComponent(a)}&name=${encodeURIComponent(album)}`;
 const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
 if (!res.ok) return null;
-const d = await res.json();
+const raw = await res.json();
+// Normalize new API format { criticScore, userScore, reviews[] } to internal format
+let d = raw;
+if (raw && (raw.criticScore || raw.userScore)) {
+    d = {
+        url: raw.url,
+        critic: raw.criticScore ? { score: raw.criticScore, count: raw.criticCount || null, reviews: (raw.reviews || []).map(r => ({ score: r.score, publication: r.publication, author: r.author, text: r.text, url: r.url })) } : null,
+        user: raw.userScore ? { score: raw.userScore, count: raw.userCount || null } : null,
+    };
+}
 if (d && (d.critic || d.user)) { _aotyCache.set(key, d); return d; }
 } catch(_) {}
 return null;
@@ -48952,4 +48985,506 @@ if (screen?.classList.contains('album-view')) setTimeout(_applyMetaEditToAlbumBa
 });
 bodyObs.observe(document.getElementById('library-screen') || document.body, { attributes: true, attributeFilter: ['class'] });
 });
+</script>
+
+<script>
+// Goot File Manager — integrated into admin settings panel
+(function() {
+'use strict';
+
+const GFM_BASE = typeof PLAYER_WORKER_URL !== 'undefined'
+    ? (window.GOOT_LOCAL_BASE || 'https://fuckinthedog.tail1ec02c.ts.net')
+    : 'https://fuckinthedog.tail1ec02c.ts.net';
+const LOCAL_BASE = 'https://fuckinthedog.tail1ec02c.ts.net';
+const ADMIN_KEY = 'penis';
+
+let _gfmStack = []; // [{id, name}]
+let _gfmLoading = false;
+let _gfmDragTarget = null;
+
+function _h(tag, attrs, ...children) {
+    const el = document.createElement(tag);
+    if (attrs) Object.entries(attrs).forEach(([k, v]) => {
+        if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
+        else if (k.startsWith('on')) el[k] = v;
+        else el.setAttribute(k, v);
+    });
+    children.flat(Infinity).forEach(c => {
+        if (c == null) return;
+        el.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+    });
+    return el;
+}
+
+function _css(styles) {
+    const id = 'gfm-styles';
+    if (document.getElementById(id)) return;
+    const s = document.createElement('style');
+    s.id = id;
+    s.textContent = styles;
+    document.head.appendChild(s);
+}
+
+function _initStyles() {
+    _css(`
+#gfm-root { padding: 0; }
+.gfm-toolbar { display:flex; align-items:center; gap:8px; padding:12px 16px; border-bottom:1px solid color-mix(in srgb,var(--md-sys-color-outline) 20%,transparent); flex-wrap:wrap; }
+.gfm-breadcrumb { display:flex; align-items:center; gap:4px; flex:1; min-width:0; flex-wrap:wrap; }
+.gfm-breadcrumb-chip { font-size:13px; padding:4px 8px; border-radius:8px; background:color-mix(in srgb,var(--md-sys-color-surface-variant) 60%,transparent); cursor:pointer; white-space:nowrap; border:none; color:inherit; }
+.gfm-breadcrumb-chip:hover { background:color-mix(in srgb,var(--md-sys-color-primary) 15%,transparent); }
+.gfm-breadcrumb-sep { opacity:0.35; font-size:11px; }
+.gfm-btn { display:flex; align-items:center; gap:6px; padding:7px 12px; border-radius:10px; border:none; cursor:pointer; font-size:13px; font-family:inherit; transition:background 0.15s; white-space:nowrap; }
+.gfm-btn-tonal { background:color-mix(in srgb,var(--md-sys-color-secondary-container) 80%,transparent); color:var(--md-sys-color-on-secondary-container); }
+.gfm-btn-tonal:hover { background:var(--md-sys-color-secondary-container); }
+.gfm-btn-danger { background:color-mix(in srgb,var(--md-sys-color-error-container) 70%,transparent); color:var(--md-sys-color-on-error-container); }
+.gfm-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:10px; padding:14px 16px; }
+.gfm-item { display:flex; flex-direction:column; align-items:center; gap:6px; padding:10px 8px; border-radius:12px; cursor:pointer; transition:background 0.15s; position:relative; text-align:center; }
+.gfm-item:hover { background:color-mix(in srgb,var(--md-sys-color-surface-variant) 60%,transparent); }
+.gfm-item-icon { width:72px; height:72px; border-radius:10px; background:color-mix(in srgb,var(--md-sys-color-surface-variant) 80%,transparent); display:flex; align-items:center; justify-content:center; font-size:28px; overflow:hidden; flex-shrink:0; position:relative; }
+.gfm-item-icon img { width:100%; height:100%; object-fit:cover; border-radius:10px; }
+.gfm-item-name { font-size:12px; line-height:1.3; word-break:break-word; opacity:0.9; width:100%; }
+.gfm-item-meta { font-size:11px; opacity:0.45; }
+.gfm-item-actions { position:absolute; top:4px; right:4px; display:none; gap:4px; }
+.gfm-item:hover .gfm-item-actions { display:flex; }
+.gfm-item-action-btn { width:24px; height:24px; border-radius:6px; border:none; background:color-mix(in srgb,var(--md-sys-color-surface) 90%,transparent); color:inherit; cursor:pointer; font-size:11px; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(4px); }
+.gfm-empty { text-align:center; padding:40px 16px; opacity:0.45; font-size:14px; }
+.gfm-drop-zone { border:2px dashed color-mix(in srgb,var(--md-sys-color-primary) 40%,transparent); border-radius:12px; padding:24px; text-align:center; font-size:14px; opacity:0.6; margin:0 16px 14px; transition:all 0.15s; }
+.gfm-drop-zone.drag-over { border-color:var(--md-sys-color-primary); opacity:1; background:color-mix(in srgb,var(--md-sys-color-primary) 8%,transparent); }
+.gfm-status { padding:8px 16px; font-size:13px; }
+.gfm-status.ok { color:color-mix(in srgb,var(--md-sys-color-primary) 90%,transparent); }
+.gfm-status.err { color:var(--md-sys-color-error); }
+.gfm-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:9999; display:flex; align-items:center; justify-content:center; padding:20px; }
+.gfm-modal { background:var(--md-sys-color-surface); border-radius:16px; padding:24px; min-width:280px; max-width:420px; width:100%; box-shadow:0 8px 32px rgba(0,0,0,0.3); }
+.gfm-modal h3 { margin:0 0 16px; font-size:17px; }
+.gfm-input { width:100%; box-sizing:border-box; padding:10px 14px; border-radius:10px; border:1px solid color-mix(in srgb,var(--md-sys-color-primary) 30%,transparent); background:color-mix(in srgb,var(--md-sys-color-surface-variant) 60%,transparent); color:inherit; font-size:14px; font-family:inherit; outline:none; margin-bottom:12px; }
+.gfm-modal-btns { display:flex; gap:8px; justify-content:flex-end; }
+.gfm-upload-list { margin:8px 0; font-size:12px; max-height:120px; overflow-y:auto; }
+.gfm-upload-item { display:flex; align-items:center; gap:6px; padding:3px 0; }
+.gfm-upload-item i { width:14px; text-align:center; }
+.gfm-cover-preview { width:80px; height:80px; border-radius:10px; object-fit:cover; margin-bottom:8px; }
+`);
+}
+
+function _currentFolderId() {
+    return _gfmStack.length ? _gfmStack[_gfmStack.length-1].id : '';
+}
+
+function _currentFolderName() {
+    return _gfmStack.length ? _gfmStack[_gfmStack.length-1].name : 'Root';
+}
+
+function _showStatus(msg, isErr) {
+    const root = document.getElementById('gfm-root');
+    if (!root) return;
+    let s = root.querySelector('.gfm-status');
+    if (!s) { s = _h('div', {class:'gfm-status'}); root.appendChild(s); }
+    s.textContent = msg;
+    s.className = 'gfm-status ' + (isErr ? 'err' : 'ok');
+    clearTimeout(s._t);
+    s._t = setTimeout(() => { s.textContent = ''; s.className = 'gfm-status'; }, 4000);
+}
+
+async function _loadFolder(folderId, folderName) {
+    if (_gfmLoading) return;
+    _gfmLoading = true;
+    const root = document.getElementById('gfm-root');
+    if (!root) { _gfmLoading = false; return; }
+
+    // Fetch folder contents from local server
+    let files = [];
+    try {
+        const res = await fetch(`${LOCAL_BASE}/list?folder=${encodeURIComponent(folderId)}`);
+        if (!res.ok) throw new Error('status ' + res.status);
+        const json = await res.json();
+        files = json.files || json || [];
+    } catch(e) {
+        _gfmLoading = false;
+        _showStatus('Failed to load folder: ' + e.message, true);
+        return;
+    }
+
+    const folders = files.filter(f => f.mimeType === 'application/vnd.google-apps.folder' || f.isDir);
+    const audioFiles = files.filter(f => f.mimeType && (f.mimeType.startsWith('audio/') || f.mimeType.startsWith('video/')));
+    const imageFiles = files.filter(f => f.mimeType && f.mimeType.startsWith('image/'));
+    const otherFiles = files.filter(f => !folders.includes(f) && !audioFiles.includes(f) && !imageFiles.includes(f));
+
+    root.innerHTML = '';
+    _initStyles();
+
+    // Toolbar
+    const breadcrumb = _h('div', {class:'gfm-breadcrumb'});
+    const homeCrumb = _h('button', {class:'gfm-breadcrumb-chip', onclick: () => { _gfmStack = []; _loadFolder('', 'Root'); }}, 'Root');
+    breadcrumb.appendChild(homeCrumb);
+    _gfmStack.forEach((item, i) => {
+        breadcrumb.appendChild(_h('span', {class:'gfm-breadcrumb-sep'}, '›'));
+        const chip = _h('button', {class:'gfm-breadcrumb-chip' + (i === _gfmStack.length-1 ? ' active' : ''), onclick: () => {
+            _gfmStack = _gfmStack.slice(0, i+1);
+            _loadFolder(item.id, item.name);
+        }}, item.name);
+        breadcrumb.appendChild(chip);
+    });
+
+    const newFolderBtn = _h('button', {class:'gfm-btn gfm-btn-tonal', onclick: _showNewFolderModal},
+        _h('i', {class:'fa-solid fa-folder-plus'}), 'New Folder');
+    const refreshBtn = _h('button', {class:'gfm-btn gfm-btn-tonal', onclick: () => _loadFolder(_currentFolderId(), _currentFolderName())},
+        _h('i', {class:'fa-solid fa-rotate'}));
+
+    root.appendChild(_h('div', {class:'gfm-toolbar'}, breadcrumb, newFolderBtn, refreshBtn));
+
+    // Drop zone
+    const dropZone = _h('div', {class:'gfm-drop-zone'},
+        _h('i', {class:'fa-solid fa-cloud-arrow-up', style:{fontSize:'20px',display:'block',marginBottom:'6px'}}),
+        'Drop files here or click to upload'
+    );
+    dropZone.addEventListener('click', () => { const inp = document.createElement('input'); inp.type='file'; inp.multiple=true; inp.onchange=e=>_uploadFiles(e.target.files); inp.click(); });
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); _uploadFiles(e.dataTransfer.files); });
+    root.appendChild(dropZone);
+
+    // Grid
+    const grid = _h('div', {class:'gfm-grid'});
+
+    if (!folders.length && !audioFiles.length && !imageFiles.length && !otherFiles.length) {
+        grid.appendChild(_h('div', {class:'gfm-empty', style:{gridColumn:'1/-1'}}, 'Empty folder'));
+    }
+
+    folders.forEach(f => {
+        const icon = _h('div', {class:'gfm-item-icon'}, _h('i', {class:'fa-solid fa-folder', style:{color:'var(--md-sys-color-primary)'}}));
+        // Try to load cover — pass relative path so /list?folder= resolves correctly
+        _loadCoverForFolder(f.path || f.id, icon);
+
+        const renameBtn = _h('button', {class:'gfm-item-action-btn', title:'Rename', onclick: e => { e.stopPropagation(); _showRenameModal(f.id, f.name); }}, _h('i', {class:'fa-solid fa-pen'}));
+        const coverBtn = _h('button', {class:'gfm-item-action-btn', title:'Set cover', onclick: e => { e.stopPropagation(); _showCoverModal(f.id, f.name); }}, _h('i', {class:'fa-solid fa-image'}));
+        const deleteBtn = _h('button', {class:'gfm-item-action-btn', title:'Delete', style:{color:'var(--md-sys-color-error)'}, onclick: e => { e.stopPropagation(); _showDeleteFolderModal(f.id, f.name); }}, _h('i', {class:'fa-solid fa-trash'}));
+        const actions = _h('div', {class:'gfm-item-actions'}, renameBtn, coverBtn, deleteBtn);
+
+        const item = _h('div', {class:'gfm-item', onclick: () => { _gfmStack.push({id: f.id, name: f.name}); _loadFolder(f.id, f.name); }},
+            icon, actions,
+            _h('div', {class:'gfm-item-name'}, f.name)
+        );
+        grid.appendChild(item);
+    });
+
+    [...audioFiles, ...imageFiles, ...otherFiles].forEach(f => {
+        const icon = _fileIcon(f);
+        const renameBtn = _h('button', {class:'gfm-item-action-btn', title:'Rename', onclick: e => { e.stopPropagation(); _showRenameFileModal(f.id, f.name); }}, _h('i', {class:'fa-solid fa-pen'}));
+        const deleteBtn = _h('button', {class:'gfm-item-action-btn', title:'Delete', style:{color:'var(--md-sys-color-error)'}, onclick: e => { e.stopPropagation(); _showDeleteFileModal(f.id, f.name); }}, _h('i', {class:'fa-solid fa-trash'}));
+        const actions = _h('div', {class:'gfm-item-actions'}, renameBtn, deleteBtn);
+        const item = _h('div', {class:'gfm-item'},
+            icon, actions,
+            _h('div', {class:'gfm-item-name'}, f.name),
+            _h('div', {class:'gfm-item-meta'}, f.size ? _formatSize(f.size) : '')
+        );
+        grid.appendChild(item);
+    });
+
+    root.appendChild(grid);
+    _gfmLoading = false;
+}
+
+async function _loadCoverForFolder(folderId, iconEl) {
+    try {
+        const res = await fetch(`${LOCAL_BASE}/list?folder=${encodeURIComponent(folderId)}`);
+        if (!res.ok) return;
+        const json = await res.json();
+        const files = json.files || json || [];
+        const imageExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.bmp'];
+        const preferredNames = ['cover', 'folder', 'album', 'artwork', 'art'];
+        let cover = files.find(f => {
+            const nm = (f.name || '').toLowerCase();
+            return (f.mimeType?.startsWith('image/') || imageExts.some(e => nm.endsWith(e))) &&
+                   preferredNames.some(p => nm.includes(p));
+        });
+        if (!cover) cover = files.find(f => {
+            const nm = (f.name || '').toLowerCase();
+            return f.mimeType?.startsWith('image/') || imageExts.some(e => nm.endsWith(e));
+        });
+        if (!cover) return;
+        const img = _h('img', {src: `${LOCAL_BASE}/audio?id=${encodeURIComponent(cover.id)}`, alt: ''});
+        img.onload = () => { iconEl.innerHTML = ''; iconEl.appendChild(img); };
+    } catch(_) {}
+}
+
+function _fileIcon(f) {
+    const mime = f.mimeType || '';
+    let icon = 'fa-file', color = '';
+    if (mime.startsWith('audio/')) { icon = 'fa-music'; color = 'color:var(--md-sys-color-primary)'; }
+    else if (mime.startsWith('video/')) { icon = 'fa-film'; color = 'color:#e07b39'; }
+    else if (mime.startsWith('image/')) { icon = 'fa-image'; color = 'color:#4caf50'; }
+    return _h('div', {class:'gfm-item-icon'}, _h('i', {class:'fa-solid ' + icon, style: color ? {color: color.split(':')[1]} : {}}));
+}
+
+function _formatSize(bytes) {
+    if (bytes > 1024*1024) return (bytes/1024/1024).toFixed(1) + ' MB';
+    if (bytes > 1024) return (bytes/1024).toFixed(0) + ' KB';
+    return bytes + ' B';
+}
+
+function _showNewFolderModal() {
+    const overlay = _h('div', {class:'gfm-modal-overlay'});
+    const input = _h('input', {class:'gfm-input', placeholder:'Folder name', type:'text'});
+    const status = _h('div', {style:{fontSize:'13px',color:'var(--md-sys-color-error)',marginBottom:'8px',display:'none'}});
+
+    const doCreate = async () => {
+        const name = input.value.trim();
+        if (!name) return;
+        try {
+            const res = await fetch(`${LOCAL_BASE}/folder/create`, {
+                method:'POST',
+                headers:{'Content-Type':'application/json','X-Admin-Key':ADMIN_KEY},
+                body: JSON.stringify({parentFolder: _currentFolderId(), name})
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                overlay.remove();
+                _showStatus('✓ Created: ' + data.path);
+                _loadFolder(_currentFolderId(), _currentFolderName());
+            } else {
+                status.textContent = data.error || 'Error';
+                status.style.display = '';
+            }
+        } catch(e) { status.textContent = e.message; status.style.display = ''; }
+    };
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') doCreate(); if (e.key === 'Escape') overlay.remove(); });
+
+    overlay.appendChild(_h('div', {class:'gfm-modal'},
+        _h('h3', {}, 'New Folder'),
+        status, input,
+        _h('div', {class:'gfm-modal-btns'},
+            _h('button', {class:'gfm-btn gfm-btn-tonal', onclick: () => overlay.remove()}, 'Cancel'),
+            _h('button', {class:'gfm-btn gfm-btn-tonal', onclick: doCreate}, _h('i', {class:'fa-solid fa-folder-plus'}), 'Create')
+        )
+    ));
+    document.body.appendChild(overlay);
+    setTimeout(() => input.focus(), 50);
+}
+
+function _showRenameModal(folderId, currentName) {
+    const overlay = _h('div', {class:'gfm-modal-overlay'});
+    const input = _h('input', {class:'gfm-input', type:'text', value: currentName});
+    const status = _h('div', {style:{fontSize:'13px',color:'var(--md-sys-color-error)',marginBottom:'8px',display:'none'}});
+
+    const doRename = async () => {
+        const newName = input.value.trim();
+        if (!newName || newName === currentName) { overlay.remove(); return; }
+        try {
+            const res = await fetch(`${LOCAL_BASE}/folder/rename`, {
+                method:'POST',
+                headers:{'Content-Type':'application/json','X-Admin-Key':ADMIN_KEY},
+                body: JSON.stringify({folder: folderId, newName})
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                overlay.remove();
+                _showStatus('✓ Renamed to: ' + newName);
+                _loadFolder(_currentFolderId(), _currentFolderName());
+            } else {
+                status.textContent = data.error || 'Error';
+                status.style.display = '';
+            }
+        } catch(e) { status.textContent = e.message; status.style.display = ''; }
+    };
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') doRename(); if (e.key === 'Escape') overlay.remove(); });
+
+    overlay.appendChild(_h('div', {class:'gfm-modal'},
+        _h('h3', {}, 'Rename: ' + currentName),
+        status, input,
+        _h('div', {class:'gfm-modal-btns'},
+            _h('button', {class:'gfm-btn gfm-btn-tonal', onclick: () => overlay.remove()}, 'Cancel'),
+            _h('button', {class:'gfm-btn gfm-btn-tonal', onclick: doRename}, _h('i', {class:'fa-solid fa-pen'}), 'Rename')
+        )
+    ));
+    document.body.appendChild(overlay);
+    setTimeout(() => { input.focus(); input.select(); }, 50);
+}
+
+function _showCoverModal(folderId, folderName) {
+    const overlay = _h('div', {class:'gfm-modal-overlay'});
+    const preview = _h('img', {class:'gfm-cover-preview', style:{display:'none'}});
+    let selectedFile = null;
+
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'image/*';
+    fileInput.onchange = e => {
+        selectedFile = e.target.files[0];
+        if (selectedFile) {
+            preview.src = URL.createObjectURL(selectedFile);
+            preview.style.display = 'block';
+        }
+    };
+
+    const dropArea = _h('div', {class:'gfm-drop-zone', style:{margin:'0 0 12px',cursor:'pointer'}},
+        preview,
+        _h('div', {}, _h('i', {class:'fa-solid fa-image', style:{marginRight:'6px'}}), 'Click or drop image')
+    );
+    dropArea.onclick = () => fileInput.click();
+    dropArea.addEventListener('dragover', e => { e.preventDefault(); dropArea.classList.add('drag-over'); });
+    dropArea.addEventListener('dragleave', () => dropArea.classList.remove('drag-over'));
+    dropArea.addEventListener('drop', e => {
+        e.preventDefault(); dropArea.classList.remove('drag-over');
+        selectedFile = e.dataTransfer.files[0];
+        if (selectedFile) { preview.src = URL.createObjectURL(selectedFile); preview.style.display = 'block'; }
+    });
+
+    const status = _h('div', {style:{fontSize:'13px',color:'var(--md-sys-color-error)',marginBottom:'8px',display:'none'}});
+
+    const doUpload = async () => {
+        if (!selectedFile) return;
+        const fd = new FormData();
+        fd.append('file', selectedFile);
+        try {
+            const res = await fetch(`${LOCAL_BASE}/folder/cover?folder=${encodeURIComponent(folderId)}`, {
+                method:'POST', headers:{'X-Admin-Key':ADMIN_KEY}, body: fd
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                overlay.remove();
+                _showStatus('✓ Cover set for: ' + folderName);
+                _loadFolder(_currentFolderId(), _currentFolderName());
+            } else {
+                status.textContent = data.error || 'Error';
+                status.style.display = '';
+            }
+        } catch(e) { status.textContent = e.message; status.style.display = ''; }
+    };
+
+    overlay.appendChild(_h('div', {class:'gfm-modal'},
+        _h('h3', {}, 'Set Cover: ' + folderName),
+        status, dropArea,
+        _h('div', {class:'gfm-modal-btns'},
+            _h('button', {class:'gfm-btn gfm-btn-tonal', onclick: () => overlay.remove()}, 'Cancel'),
+            _h('button', {class:'gfm-btn gfm-btn-tonal', onclick: doUpload}, _h('i', {class:'fa-solid fa-upload'}), 'Set Cover')
+        )
+    ));
+    document.body.appendChild(overlay);
+}
+
+function _showDeleteFolderModal(folderId, folderName) {
+    const overlay = _h('div', {class:'gfm-modal-overlay'});
+    const status = _h('div', {style:{fontSize:'13px',color:'var(--md-sys-color-error)',marginBottom:'8px',display:'none'}});
+    const doDelete = async () => {
+        try {
+            const res = await fetch(`${LOCAL_BASE}/folder/delete`, {
+                method:'POST', headers:{'Content-Type':'application/json','X-Admin-Key':ADMIN_KEY},
+                body: JSON.stringify({folder: folderId})
+            });
+            const data = await res.json();
+            if (res.ok && data.success) { overlay.remove(); _showStatus('✓ Deleted: ' + folderName); _loadFolder(_currentFolderId(), _currentFolderName()); }
+            else { status.textContent = data.error || 'Error'; status.style.display = ''; }
+        } catch(e) { status.textContent = e.message; status.style.display = ''; }
+    };
+    overlay.appendChild(_h('div', {class:'gfm-modal'},
+        _h('h3', {}, 'Delete folder?'),
+        _h('div', {style:{fontSize:'14px',marginBottom:'14px',opacity:'0.8'}}, `"${folderName}" and all its contents will be permanently deleted.`),
+        status,
+        _h('div', {class:'gfm-modal-btns'},
+            _h('button', {class:'gfm-btn gfm-btn-tonal', onclick: () => overlay.remove()}, 'Cancel'),
+            _h('button', {class:'gfm-btn gfm-btn-danger', onclick: doDelete}, _h('i', {class:'fa-solid fa-trash'}), ' Delete')
+        )
+    ));
+    document.body.appendChild(overlay);
+}
+
+function _showDeleteFileModal(fileId, fileName) {
+    const overlay = _h('div', {class:'gfm-modal-overlay'});
+    const status = _h('div', {style:{fontSize:'13px',color:'var(--md-sys-color-error)',marginBottom:'8px',display:'none'}});
+    const doDelete = async () => {
+        try {
+            const res = await fetch(`${LOCAL_BASE}/file/delete`, {
+                method:'POST', headers:{'Content-Type':'application/json','X-Admin-Key':ADMIN_KEY},
+                body: JSON.stringify({id: fileId})
+            });
+            const data = await res.json();
+            if (res.ok && data.success) { overlay.remove(); _showStatus('✓ Deleted: ' + fileName); _loadFolder(_currentFolderId(), _currentFolderName()); }
+            else { status.textContent = data.error || 'Error'; status.style.display = ''; }
+        } catch(e) { status.textContent = e.message; status.style.display = ''; }
+    };
+    overlay.appendChild(_h('div', {class:'gfm-modal'},
+        _h('h3', {}, 'Delete file?'),
+        _h('div', {style:{fontSize:'14px',marginBottom:'14px',opacity:'0.8'}}, `"${fileName}" will be permanently deleted.`),
+        status,
+        _h('div', {class:'gfm-modal-btns'},
+            _h('button', {class:'gfm-btn gfm-btn-tonal', onclick: () => overlay.remove()}, 'Cancel'),
+            _h('button', {class:'gfm-btn gfm-btn-danger', onclick: doDelete}, _h('i', {class:'fa-solid fa-trash'}), ' Delete')
+        )
+    ));
+    document.body.appendChild(overlay);
+}
+
+function _showRenameFileModal(fileId, currentName) {
+    const overlay = _h('div', {class:'gfm-modal-overlay'});
+    const input = _h('input', {class:'gfm-input', type:'text', value: currentName});
+    const status = _h('div', {style:{fontSize:'13px',color:'var(--md-sys-color-error)',marginBottom:'8px',display:'none'}});
+    const doRename = async () => {
+        const newName = input.value.trim();
+        if (!newName || newName === currentName) { overlay.remove(); return; }
+        try {
+            const res = await fetch(`${LOCAL_BASE}/file/rename`, {
+                method:'POST', headers:{'Content-Type':'application/json','X-Admin-Key':ADMIN_KEY},
+                body: JSON.stringify({id: fileId, newName})
+            });
+            const data = await res.json();
+            if (res.ok && data.success) { overlay.remove(); _showStatus('✓ Renamed to: ' + newName); _loadFolder(_currentFolderId(), _currentFolderName()); }
+            else { status.textContent = data.error || 'Error'; status.style.display = ''; }
+        } catch(e) { status.textContent = e.message; status.style.display = ''; }
+    };
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') doRename(); if (e.key === 'Escape') overlay.remove(); });
+    overlay.appendChild(_h('div', {class:'gfm-modal'},
+        _h('h3', {}, 'Rename: ' + currentName),
+        status, input,
+        _h('div', {class:'gfm-modal-btns'},
+            _h('button', {class:'gfm-btn gfm-btn-tonal', onclick: () => overlay.remove()}, 'Cancel'),
+            _h('button', {class:'gfm-btn gfm-btn-tonal', onclick: doRename}, _h('i', {class:'fa-solid fa-pen'}), ' Rename')
+        )
+    ));
+    document.body.appendChild(overlay);
+    setTimeout(() => { input.focus(); input.select(); }, 50);
+}
+
+async function _uploadFiles(fileList) {
+    if (!fileList || !fileList.length) return;
+    const files = Array.from(fileList);
+    const folderId = _currentFolderId();
+    _showStatus(`Uploading ${files.length} file${files.length>1?'s':''}…`);
+
+    const results = [];
+    for (const file of files) {
+        const fd = new FormData();
+        fd.append('file', file);
+        try {
+            const res = await fetch(`${LOCAL_BASE}/upload?folder=${encodeURIComponent(folderId)}`, {
+                method:'POST', headers:{'X-Admin-Key':ADMIN_KEY}, body: fd
+            });
+            const data = await res.json();
+            if (res.ok && data.success) results.push(`✓ ${file.name}`);
+            else results.push(`✗ ${file.name}: ${data.error || res.status}`);
+        } catch(e) { results.push(`✗ ${file.name}: ${e.message}`); }
+    }
+    const anyFailed = results.some(r => r.startsWith('✗'));
+    _showStatus(results.join(' | '), anyFailed);
+    _loadFolder(folderId, _currentFolderName());
+}
+
+// Hook into openSettingsSection to init the file manager when opened
+const _gfmOrigOpen = typeof openSettingsSection === 'function' ? openSettingsSection : null;
+window._gfmOpenHooked = false;
+function _hookGfmOpen() {
+    if (window._gfmOpenHooked) return;
+    if (typeof openSettingsSection !== 'function') return;
+    const orig = openSettingsSection;
+    window.openSettingsSection = function(key) {
+        orig(key);
+        if (key === 'file-manager') {
+            _gfmStack = [];
+            _loadFolder('', 'Root');
+        }
+    };
+    window._gfmOpenHooked = true;
+}
+setTimeout(_hookGfmOpen, 500);
+document.addEventListener('DOMContentLoaded', _hookGfmOpen);
+
+})();
 </script>
