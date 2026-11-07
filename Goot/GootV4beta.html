@@ -51890,6 +51890,20 @@ function _showCoverModal(folderId, folderName) {
     document.body.appendChild(overlay);
 }
 
+// Remove deleted files' metadata from D1 (track_metadata + file_hashes) so nothing stale is left behind.
+async function _forgetDeletedMetadata(ids) {
+    ids = (ids || []).filter(Boolean);
+    if (!ids.length) return;
+    try {
+        await fetch(`${METADATA_API_URL}/admin/forget`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-Admin-Key': ADMIN_KEY },
+            body: JSON.stringify({ ids })
+        });
+    } catch (_) { /* non-fatal: the file is already deleted */ }
+    try { ids.forEach(id => { if (typeof trackMetadata !== 'undefined') delete trackMetadata[id]; }); } catch (_) {}
+}
+
 function _showDeleteFolderModal(folderId, folderName) {
     const overlay = _h('div', {class:'gfm-modal-overlay'});
     const status = _h('div', {style:{fontSize:'13px',color:'var(--md-sys-color-error)',marginBottom:'8px',display:'none'}});
@@ -51900,7 +51914,7 @@ function _showDeleteFolderModal(folderId, folderName) {
                 body: JSON.stringify({folder: folderId})
             });
             const data = await res.json();
-            if (res.ok && data.success) { overlay.remove(); _showStatus('✓ Deleted: ' + folderName); _invalidateMainAppFolderCache(); _loadFolder(_currentFolderId(), _currentFolderName()); }
+            if (res.ok && data.success) { await _forgetDeletedMetadata(data.ids); overlay.remove(); _showStatus('✓ Deleted: ' + folderName); _invalidateMainAppFolderCache(); _loadFolder(_currentFolderId(), _currentFolderName()); }
             else { status.textContent = data.error || 'Error'; status.style.display = ''; }
         } catch(e) { status.textContent = e.message; status.style.display = ''; }
     };
@@ -51926,7 +51940,7 @@ function _showDeleteFileModal(fileId, fileName) {
                 body: JSON.stringify({id: fileId})
             });
             const data = await res.json();
-            if (res.ok && data.success) { overlay.remove(); _showStatus('✓ Deleted: ' + fileName); _invalidateMainAppFolderCache(); _loadFolder(_currentFolderId(), _currentFolderName()); }
+            if (res.ok && data.success) { await _forgetDeletedMetadata([fileId]); overlay.remove(); _showStatus('✓ Deleted: ' + fileName); _invalidateMainAppFolderCache(); _loadFolder(_currentFolderId(), _currentFolderName()); }
             else { status.textContent = data.error || 'Error'; status.style.display = ''; }
         } catch(e) { status.textContent = e.message; status.style.display = ''; }
     };
@@ -51980,6 +51994,7 @@ async function _uploadFiles(fileList) {
 
     const results = [];
     const uploadedIds = [];
+    const uploadedNames = {};
     for (const file of files) {
         const fd = new FormData();
         fd.append('file', file);
@@ -51990,25 +52005,47 @@ async function _uploadFiles(fileList) {
             const data = await res.json();
             if (res.ok && data.success) {
                 results.push(`✓ ${file.name}`);
-                if (data.id) uploadedIds.push(data.id);
+                if (data.id) { uploadedIds.push(data.id); uploadedNames[data.id] = file.name; }
             }
             else results.push(`✗ ${file.name}: ${data.error || res.status}`);
         } catch(e) { results.push(`✗ ${file.name}: ${e.message}`); }
     }
     const anyFailed = results.some(r => r.startsWith('✗'));
 
-    if (uploadedIds.length) {
+    let scanNote = '';
+    let scanFailed = false;
+    const audioIds = uploadedIds.filter(id => /\.(mp3|flac|wav|m4a|aac|ogg|opus|wma|aiff?)$/i.test(uploadedNames[id] || ''));
+    if (audioIds.length) {
         _showStatus(results.join(' | ') + ' — scanning tags…', anyFailed);
-        try {
-            await fetch(`${METADATA_API_URL}/metadata/scan`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ folderId, fileIds: uploadedIds })
-            });
-        } catch(_) { /* non-fatal: files are uploaded either way, scan can be retried */ }
+        // Wipe any stale D1 rows for these ids first so the worker can't skip them as "already scanned".
+        await _forgetDeletedMetadata(audioIds);
+        let remaining = audioIds.slice();
+        const noTags = [];
+        for (let attempt = 0; attempt < 3 && remaining.length; attempt++) {
+            try {
+                const r = await fetch(`${METADATA_API_URL}/metadata/scan`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ folderId, fileIds: remaining })
+                });
+                if (r.ok) {
+                    const d = await r.json();
+                    const done = new Set([...(d.scanned || []).map(x => x.id), ...(d.already_existed || [])]);
+                    (d.scanned || []).forEach(x => { if (!x.album || x.album === 'Unknown' || !x.artist || x.artist === 'Unknown') noTags.push(uploadedNames[x.id] || x.id); });
+                    remaining = remaining.filter(id => !done.has(id));
+                }
+            } catch (_) { /* retry below */ }
+            if (remaining.length) await new Promise(res => setTimeout(res, 1500));
+        }
+        const okCount = audioIds.length - remaining.length;
+        scanNote = ` — scanned ${okCount}/${audioIds.length}`;
+        if (noTags.length) scanNote += ` (no tags in: ${noTags.join(', ')})`;
+        if (remaining.length) { scanNote += ` — FAILED to scan: ${remaining.map(id => uploadedNames[id] || id).join(', ')}`; }
+        scanFailed = remaining.length > 0 || noTags.length > 0;
     }
 
-    _showStatus(results.join(' | '), anyFailed);
+    _showStatus(results.join(' | ') + scanNote, anyFailed || scanFailed);
+    try { if (typeof _invalidateMainAppFolderCache === 'function') _invalidateMainAppFolderCache(); } catch (_) {}
     _loadFolder(folderId, _currentFolderName());
 }
 
@@ -52030,6 +52067,259 @@ function _hookGfmOpen() {
 setTimeout(_hookGfmOpen, 500);
 document.addEventListener('DOMContentLoaded', _hookGfmOpen);
 
+})();
+</script>
+<script>
+// ─────────────────────────────────────────────────────────────────────────
+// PRESAVE -- album view with a countdown + release date until it unlocks.
+//  • Everyone: a presave album looks like a normal album view, but the tracks
+//    are grayed out, Play/Shuffle are hidden, and a countdown shows.
+//  • Admin tools unlocked: buttons to mark an album as a presave, edit the
+//    date, or remove the presave. (Tracks are uploaded via the File Manager.)
+// The server enforces the lock (see /presave/* in server.js).
+// ─────────────────────────────────────────────────────────────────────────
+(function () {
+'use strict';
+
+const BASE = typeof GOOT_LOCAL_DIRECT_BASE !== 'undefined' ? GOOT_LOCAL_DIRECT_BASE : 'https://goot-api.duckdns.org:3500';
+const ADMIN_KEY = 'penis';
+const $ = (id) => document.getElementById(id);
+
+let _presaves = [];
+let _offset = 0;
+let _timer = null;
+const nowMs = () => Date.now() + _offset;
+const pad2 = (n) => String(n).padStart(2, '0');
+
+function ordinal(n) { const v = n % 100; return n + (['th', 'st', 'nd', 'rd'][(v - 20) % 10] || ['th', 'st', 'nd', 'rd'][v] || 'th'); }
+function fmtDate(ts) {
+    const d = new Date(ts);
+    return `${d.toLocaleString(undefined, { month: 'long' })} ${ordinal(d.getDate())}, ${d.getFullYear()}`;
+}
+function toLocalInput(ts) {
+    const d = new Date(ts);
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+function isAdmin() {
+    const row = $('settings-nav-file-manager');
+    return !!row && row.style.display !== 'none';
+}
+function invalidateCache() {
+    try { if (typeof folderContentsCache !== 'undefined' && folderContentsCache.clear) folderContentsCache.clear(); } catch (_) {}
+    try { sessionStorage.removeItem(typeof FOLDER_TREE_CACHE_KEY !== 'undefined' ? FOLDER_TREE_CACHE_KEY : 'goot_folder_tree_cache'); } catch (_) {}
+}
+
+function injectStyles() {
+    if ($('presave-styles')) return;
+    const s = document.createElement('style');
+    s.id = 'presave-styles';
+    s.textContent = `
+#presaveBlock { display:flex; flex-direction:column; align-items:flex-start; gap:14px; margin-top:0; }
+
+.ps-badge { display:inline-flex; align-items:center; gap:7px; padding:6px 13px; border-radius:999px; font-size:11px; font-weight:800; letter-spacing:1.4px; text-transform:uppercase; background:rgba(255,255,255,.92); color:#111; box-shadow:0 2px 10px rgba(0,0,0,.35); }
+.ps-date { display:flex; align-items:center; gap:9px; font-size:15px; font-weight:700; opacity:1; text-shadow:0 1px 8px rgba(0,0,0,.5); letter-spacing:.2px; }
+.ps-date i { opacity:.85; font-size:13px; }
+.ps-clock { display:flex; align-items:stretch; gap:10px; }
+.ps-box { display:flex; flex-direction:column; align-items:center; justify-content:center; width:78px; height:78px; box-sizing:border-box; border-radius:16px; text-align:center; background:rgba(0,0,0,.38); border:1px solid rgba(255,255,255,.22); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); box-shadow:0 4px 18px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.08); }
+.ps-num { font-size:30px; font-weight:800; font-variant-numeric:tabular-nums; line-height:1; letter-spacing:-.5px; }
+.ps-lbl { margin-top:7px; font-size:9.5px; font-weight:700; letter-spacing:1.3px; text-transform:uppercase; opacity:.8; }
+/* Presave hero: tidy, evenly spaced, vertically centered stack */
+body #library-screen.presave-locked.album-view #folderCoverBanner > div:not(#folderCoverArt):not(#aotySection) { justify-content:center !important; gap:18px !important; }
+body #library-screen.presave-locked #folderCoverBanner > div > div:first-child { gap:6px !important; }
+body #library-screen.presave-locked #folderCoverReleaseDate,
+body #library-screen.presave-locked #folderCoverBanner > div > div:first-child > div:has(#folderCoverDuration) { display:none !important; }
+body #library-screen.presave-locked #folderCoverMeta { margin-top:0 !important; opacity:.7; }
+.ps-admin { display:flex; gap:8px; flex-wrap:wrap; }
+.ps-btn { display:inline-flex; align-items:center; gap:7px; padding:8px 14px; border-radius:10px; border:none; cursor:pointer; font:inherit; font-size:13px; font-weight:600; background:color-mix(in srgb, var(--md-sys-color-secondary-container) 85%, transparent); color:var(--md-sys-color-on-secondary-container); }
+.ps-btn:hover { filter:brightness(1.12); }
+.ps-btn.primary { background:var(--md-sys-color-primary); color:var(--md-sys-color-on-primary, #fff); }
+.ps-btn.danger { background:color-mix(in srgb, var(--md-sys-color-error-container) 75%, transparent); color:var(--md-sys-color-on-error-container); }
+#library-screen.presave-locked #libSongBody tr { opacity:.38; filter:grayscale(1); pointer-events:none; }
+#library-screen.presave-locked #folderCoverActions { display:none !important; }
+.ps-ov { position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:9999; display:flex; align-items:center; justify-content:center; padding:20px; }
+.ps-modal { background:var(--md-sys-color-surface); color:var(--md-sys-color-on-surface); border-radius:18px; padding:22px; width:100%; max-width:380px; box-shadow:0 10px 40px rgba(0,0,0,.4); }
+.ps-modal h3 { margin:0 0 12px; font-size:18px; }
+.ps-modal p { margin:0 0 12px; font-size:14px; opacity:.8; line-height:1.5; }
+.ps-input { width:100%; box-sizing:border-box; padding:10px 13px; border-radius:10px; border:1px solid color-mix(in srgb, var(--md-sys-color-primary) 30%, transparent); background:color-mix(in srgb, var(--md-sys-color-surface-variant) 60%, transparent); color:inherit; font:inherit; font-size:14px; outline:none; }
+.ps-chips { display:flex; gap:6px; flex-wrap:wrap; margin:10px 0 6px; }
+.ps-hint { font-size:12px; opacity:.6; min-height:1.4em; }
+.ps-btns { display:flex; gap:8px; justify-content:flex-end; margin-top:14px; }
+@media (max-width:600px) { .ps-box { width:62px; height:66px; border-radius:13px; } .ps-num { font-size:23px; } .ps-clock { gap:7px; } }
+`;
+    document.head.appendChild(s);
+}
+
+async function loadPresaves() {
+    try {
+        const r = await fetch(`${BASE}/presave/list`, { cache: 'no-store' });
+        if (!r.ok) throw 0;
+        const j = await r.json();
+        _offset = (Number(j.now) || Date.now()) - Date.now();
+        _presaves = j.presaves || [];
+    } catch (_) { /* older server / offline: behave as if there are no presaves */ }
+    apply();
+}
+
+function currentPresave() {
+    if (typeof stack === 'undefined' || !stack.length) return null;
+    const id = stack[stack.length - 1].id;
+    return _presaves.find(p => (p.id === id || p.folder === id) && p.releaseAt > nowMs()) || null;
+}
+
+// Rebuilds the presave UI for whatever album view is on screen.
+function apply() {
+    const ls = $('library-screen');
+    if (!ls) return;
+    injectStyles();
+    const inAlbum = ls.classList.contains('album-view');
+    const ps = inAlbum ? currentPresave() : null;
+    ls.classList.toggle('presave-locked', !!ps);
+
+    let block = $('presaveBlock');
+    const anchor = $('folderCoverActions');
+    const admin = inAlbum && isAdmin();
+    if (!inAlbum || !anchor || (!ps && !admin)) { if (block) block.remove(); stopClock(); return; }
+
+    if (!block) {
+        block = document.createElement('div');
+        block.id = 'presaveBlock';
+        anchor.parentNode.insertBefore(block, anchor);
+    }
+    const sig = ps ? `p${ps.releaseAt}${admin}` : `n${admin}`;
+    if (block.dataset.sig !== sig) {
+        block.dataset.sig = sig;
+        block.innerHTML = '';
+        if (ps) {
+            const badge = document.createElement('div');
+            badge.className = 'ps-badge';
+            badge.innerHTML = '<i class="fa-solid fa-hourglass-half"></i><span>Presave</span>';
+            const date = document.createElement('div');
+            date.className = 'ps-date';
+            date.innerHTML = '<i class="fa-regular fa-calendar"></i>';
+            date.append(`Releases ${fmtDate(ps.releaseAt)}`);
+            const clock = document.createElement('div');
+            clock.className = 'ps-clock';
+            clock.innerHTML = ['d:Days', 'h:Hours', 'm:Minutes', 's:Seconds'].map(x => { const [k, l] = x.split(':'); return `<div class="ps-box"><div class="ps-num" data-ps="${k}">00</div><div class="ps-lbl">${l}</div></div>`; }).join('');
+            block.append(badge, date, clock);
+        }
+        if (admin) {
+            const row = document.createElement('div');
+            row.className = 'ps-admin';
+            const folderId = stack[stack.length - 1].id;
+            if (ps) {
+                row.append(btn('Edit presave', 'fa-pen', () => openEditor(folderId, ps.releaseAt)),
+                           btn('Remove presave', 'fa-trash', () => removePresave(folderId), 'danger'));
+            } else {
+                row.append(btn('Make presave', 'fa-hourglass-half', () => openEditor(folderId, null)));
+            }
+            block.appendChild(row);
+        }
+    }
+    if (ps) { tickClock(); startClock(); } else stopClock();
+}
+
+function btn(label, icon, fn, kind) {
+    const b = document.createElement('button');
+    b.className = 'ps-btn' + (kind ? ' ' + kind : '');
+    b.innerHTML = `<i class="fa-solid ${icon}"></i>`;
+    b.append(' ' + label);
+    b.onclick = fn;
+    return b;
+}
+
+function startClock() { if (!_timer) _timer = setInterval(tickClock, 1000); }
+function stopClock() { if (_timer) { clearInterval(_timer); _timer = null; } }
+function tickClock() {
+    const ps = currentPresave();
+    if (!ps) { onUnlocked(); return; }
+    const t = Math.max(0, Math.floor((ps.releaseAt - nowMs()) / 1000));
+    const v = { d: Math.floor(t / 86400), h: Math.floor((t % 86400) / 3600), m: Math.floor((t % 3600) / 60), s: t % 60 };
+    document.querySelectorAll('#presaveBlock [data-ps]').forEach(el => {
+        const k = el.dataset.ps; const txt = k === 'd' ? String(v.d) : pad2(v[k]);
+        if (el.textContent !== txt) el.textContent = txt;
+    });
+}
+// Countdown hit zero while the page is open: refresh the folder so it plays normally.
+async function onUnlocked() {
+    stopClock();
+    invalidateCache();
+    try { if (typeof showNotification === 'function') showNotification('🎉 This release is out now'); } catch (_) {}
+    const ls = $('library-screen');
+    if (ls) ls.classList.remove('presave-locked');
+    const b = $('presaveBlock'); if (b) b.remove();
+    try { if (typeof refreshCurrentFolder === 'function') await refreshCurrentFolder(); } catch (_) {}
+    loadPresaves();
+}
+
+async function api(path, body) {
+    const r = await fetch(BASE + path, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Admin-Key': ADMIN_KEY }, body: JSON.stringify(body) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.error) throw new Error(j.error || 'HTTP ' + r.status);
+    return j;
+}
+
+function openEditor(folderId, current) {
+    const ov = document.createElement('div');
+    ov.className = 'ps-ov';
+    const input = document.createElement('input');
+    input.type = 'datetime-local';
+    input.className = 'ps-input';
+    if (current) input.value = toLocalInput(current);
+    const hint = document.createElement('div');
+    hint.className = 'ps-hint';
+    const upd = () => { hint.textContent = input.value ? `Releases ${fmtDate(new Date(input.value).getTime())} (your local time)` : ''; };
+    input.oninput = upd; upd();
+    const chips = document.createElement('div');
+    chips.className = 'ps-chips';
+    const preset = (label, fn) => chips.appendChild(btn(label, 'fa-clock', () => { input.value = toLocalInput(fn()); upd(); }));
+    preset('Next Friday 12 AM', () => { const d = new Date(); d.setHours(0, 0, 0, 0); let a = (5 - d.getDay() + 7) % 7; if (a === 0) a = 7; d.setDate(d.getDate() + a); return d.getTime(); });
+    preset('In 2 min (test)', () => Date.now() + 120000);
+    const err = document.createElement('div'); err.className = 'ps-hint'; err.style.color = 'var(--md-sys-color-error)';
+    const save = btn(current ? 'Save' : 'Make presave', 'fa-check', async () => {
+        const ts = new Date(input.value).getTime();
+        if (!input.value || !Number.isFinite(ts)) { err.textContent = 'Pick a release date and time.'; return; }
+        if (ts <= nowMs()) { err.textContent = 'That time is in the past.'; return; }
+        try { await api('/presave/set', { folder: folderId, releaseAt: ts }); ov.remove(); await loadPresaves(); const b = $('presaveBlock'); if (b) b.dataset.sig = ''; apply(); }
+        catch (e) { err.textContent = e.message; }
+    }, 'primary');
+    const cancel = btn('Cancel', 'fa-xmark', () => ov.remove());
+    const box = document.createElement('div');
+    box.className = 'ps-modal';
+    const h = document.createElement('h3'); h.textContent = current ? 'Edit presave' : 'Make presave';
+    const p = document.createElement('p'); p.textContent = 'Tracks stay locked and show a countdown until this time, then unlock automatically.';
+    const btns = document.createElement('div'); btns.className = 'ps-btns'; btns.append(cancel, save);
+    box.append(h, p, input, chips, hint, err, btns);
+    ov.appendChild(box);
+    ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+    document.body.appendChild(ov);
+}
+
+async function removePresave(folderId) {
+    if (!confirm('Remove this presave? The album unlocks immediately.')) return;
+    try {
+        await api('/presave/remove', { folder: folderId });
+        invalidateCache();
+        await loadPresaves();
+        const b = $('presaveBlock'); if (b) b.dataset.sig = '';
+        apply();
+    } catch (e) { alert('Failed: ' + e.message); }
+}
+
+function boot() {
+    const ls = $('library-screen');
+    let t = null;
+    const schedule = (muts) => {
+        if (muts && muts.every(m => m.target.closest && m.target.closest('#presaveBlock'))) return; // our own clock ticks
+        apply(); // run in the same frame as the album view build so it animates in together with it (no late pop-in)
+    };
+    if (ls) {
+        new MutationObserver(schedule).observe(ls, { attributes: true, attributeFilter: ['class'], childList: true, subtree: true });
+    }
+    loadPresaves();
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) loadPresaves(); });
+    setInterval(() => { if (!document.hidden) loadPresaves(); }, 5 * 60 * 1000);
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
 </script>
 <script>
